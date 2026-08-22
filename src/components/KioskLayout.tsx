@@ -2,18 +2,17 @@ import React, { useState } from 'react';
 import { AnimatedHeadline } from './AnimatedHeadline';
 import { VoiceVisualizer } from './VoiceVisualizer';
 import { BottomNoticeCards } from './BottomNoticeCards';
-import { MapRenderer } from './MapRenderer';
-import { QRCodeHandoff } from './QRCodeHandoff';
+import { LLMVoiceCockpit } from './LLMVoiceCockpit';
 import { MobileView } from './MobileView';
 import { GreetingScreen } from './GreetingScreen';
 import { VantaBackground } from './VantaBackground';
 
 import { speechService } from '../services/speechService';
-import { processUserVoiceQuery } from '../services/aiService';
-import { findRoute } from '../services/routeEngine';
-import { RouteResult, VoiceState } from '../types';
+import { resolveLLMVoiceQuery } from '../services/llmNavigationEngine';
+import { LLMRouteKnowledge, LLM_ROUTES_KNOWLEDGE } from '../data/llmRoutesKnowledge';
+import { VoiceState } from '../types';
 
-import { QrCode, Search, Sparkles, RefreshCw, Home } from 'lucide-react';
+import { QrCode, Search, Sparkles, RefreshCw, Home, Compass } from 'lucide-react';
 
 export const KioskLayout: React.FC = () => {
   // Mobile mode check
@@ -30,8 +29,8 @@ export const KioskLayout: React.FC = () => {
   const [headlineText, setHeadlineText] = useState<string>('Where would you like to go?');
   const [subtext, setSubtext] = useState<string>('Speak your destination naturally or tap one of the popular spots below.');
 
-  // Active Navigation & Modals
-  const [activeRoute, setActiveRoute] = useState<RouteResult | null>(null);
+  // Active LLM Route Knowledge
+  const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge | null>(LLM_ROUTES_KNOWLEDGE[0]);
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
   const [textSearchInput, setTextSearchInput] = useState<string>('');
 
@@ -55,7 +54,7 @@ export const KioskLayout: React.FC = () => {
     setVoiceState('listening');
     setTranscript('');
     setHeadlineText('Listening...');
-    setSubtext('Please speak clearly into the microphone (e.g., "Take me to the AI Lab")');
+    setSubtext('Please speak clearly into the microphone (e.g., "Where is the washroom?")');
 
     speechService.startListening(
       (finalText, isFinal) => {
@@ -75,55 +74,37 @@ export const KioskLayout: React.FC = () => {
     );
   };
 
-  // Process Query via AI Engine
+  // Process Query via LLM Engine
   const handleProcessVoiceQuery = (query: string) => {
     setVoiceState('processing');
-    setHeadlineText('Searching Campus Directory...');
-    setSubtext(`Analyzing entity match for "${query}"`);
+    setHeadlineText('Parsing LLM Navigation Knowledge...');
+    setSubtext(`Processing natural language intent for "${query}"`);
 
     setTimeout(() => {
-      const resolution = processUserVoiceQuery(query);
+      const result = resolveLLMVoiceQuery(query);
 
-      if (resolution.success && resolution.route) {
+      if (result.matched && result.route) {
         setVoiceState('success');
-        setActiveRoute(resolution.route);
-        setHeadlineText(resolution.matchedEntityName || 'Route Found!');
-        setSubtext(resolution.responseMessage);
+        setActiveLLMRoute(result.route);
+        setHeadlineText(result.route.destinationName);
+        setSubtext(result.responseMessage);
 
-        speechService.speak(resolution.responseMessage);
+        speechService.speak(result.responseMessage);
       } else {
         setVoiceState('error');
-        setActiveRoute(null);
         setHeadlineText('Location Not Found');
-        setSubtext(resolution.responseMessage);
+        setSubtext(result.responseMessage);
 
-        speechService.speak(resolution.responseMessage);
+        speechService.speak(result.responseMessage);
       }
-    }, 600);
-  };
-
-  // Direct Destination Selection
-  const handleSelectDestination = (destId: string, destName: string) => {
-    setVoiceState('processing');
-    setHeadlineText(`Navigating to ${destName}...`);
-
-    setTimeout(() => {
-      const route = findRoute('N_KIOSK_MAIN', destId);
-      if (route) {
-        setVoiceState('success');
-        setActiveRoute(route);
-        setHeadlineText(destName);
-        setSubtext(`Shortest path calculated from Gate #1 Kiosk. Walking distance ${route.totalDistance}m.`);
-        speechService.speak(`Calculated route to ${destName}. Scan the QR code to take it on your phone!`);
-      }
-    }, 400);
+    }, 500);
   };
 
   // Reset Kiosk
   const handleResetKiosk = () => {
     setVoiceState('idle');
     setTranscript('');
-    setActiveRoute(null);
+    setActiveLLMRoute(LLM_ROUTES_KNOWLEDGE[0]);
     setHeadlineText('Where would you like to go?');
     setSubtext('Speak your destination naturally or tap one of the popular spots below.');
   };
@@ -137,9 +118,9 @@ export const KioskLayout: React.FC = () => {
     return <GreetingScreen onSelectRole={handleSelectRole} />;
   }
 
-  // RENDER SECOND SCREEN: MAIN KIOSK VOICE & NAVIGATION SCREEN
+  // RENDER SECOND SCREEN: MAIN KIOSK LLM VOICE NAVIGATION SCREEN
   return (
-    <div className="w-screen h-screen bg-[#f8fafc] text-slate-900 flex flex-col justify-between overflow-hidden relative selection:bg-blue-600 selection:text-white">
+    <div className="w-screen h-screen bg-[#f8fafc] text-slate-900 flex flex-col justify-between overflow-hidden relative selection:bg-blue-600 selection:text-white font-l3">
       {/* Vanta.js Interactive Dots Background Animation */}
       <VantaBackground />
 
@@ -154,9 +135,9 @@ export const KioskLayout: React.FC = () => {
             <Sparkles className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <h1 className="font-patua text-lg font-black tracking-wide text-slate-900">SMART CAMPUS NAV</h1>
+            <h1 className="font-patua text-lg font-black tracking-wide text-slate-900">SMART CAMPUS VOICE NAV</h1>
             <p className="font-l3 text-[11px] text-slate-500 font-bold tracking-wider uppercase">
-              AI Kiosk • Gate 1 • <span className="text-[#1d4ed8] font-extrabold">{userRole}</span>
+              LLM Powered Voice AI • Gate 1 • <span className="text-[#1d4ed8] font-extrabold">{userRole}</span>
             </p>
           </div>
         </div>
@@ -184,20 +165,18 @@ export const KioskLayout: React.FC = () => {
               type="text"
               value={textSearchInput}
               onChange={(e) => setTextSearchInput(e.target.value)}
-              placeholder="Search building, lab, faculty..."
+              placeholder="Search washroom, lab, hod, library..."
               className="font-l3 w-full pl-9 pr-4 py-2 rounded-xl bg-slate-100 border border-slate-300 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#1d4ed8] transition-all shadow-inner"
             />
           </form>
 
-          {activeRoute && (
-            <button
-              onClick={handleResetKiosk}
-              className="font-l3 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Reset
-            </button>
-          )}
+          <button
+            onClick={handleResetKiosk}
+            className="font-l3 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-200"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Reset
+          </button>
 
           <button
             onClick={() => setIsMobileMode(true)}
@@ -208,11 +187,11 @@ export const KioskLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Kiosk Dashboard Area (Side-by-Side: Voice Assistant Left 55% + Live Map Right 45%) */}
+      {/* Main Kiosk Dashboard Area (Side-by-Side: Voice Assistant Left 50% + LLM Voice Cockpit Right 50%) */}
       <div className="flex-1 flex overflow-hidden z-10 p-4 gap-4">
         
-        {/* LEFT 55%: Voice AI Assistant & Kinetic Visualizer */}
-        <main className="w-full lg:w-[52%] flex flex-col items-center justify-between p-4 relative overflow-hidden select-none bg-white/70 backdrop-blur-md rounded-3xl border border-slate-200/80 shadow-lg">
+        {/* LEFT 50%: Voice AI Assistant & Kinetic Visualizer */}
+        <main className="w-full lg:w-[50%] flex flex-col items-center justify-between p-4 relative overflow-hidden select-none bg-white/70 backdrop-blur-md rounded-3xl border border-slate-200/80 shadow-lg">
           
           {/* Headline & Voice Status */}
           <div className="w-full flex-1 flex flex-col items-center justify-center">
@@ -226,66 +205,66 @@ export const KioskLayout: React.FC = () => {
             />
           </div>
 
-          {/* Popular Voice Suggestions or Active Route Bar */}
+          {/* Popular LLM Voice Command Suggestion Chips */}
           <div className="w-full max-w-xl mb-1">
-            {activeRoute ? (
-              <div className="p-3.5 rounded-2xl glass-card-light border border-blue-200 bg-white shadow-md flex items-center justify-between">
-                <div>
-                  <span className="font-l3 text-[10px] uppercase font-bold text-slate-500 tracking-wider">Active Route Ready</span>
-                  <h4 className="font-l2 text-base font-bold text-slate-900">{headlineText}</h4>
-                  <p className="font-l3 text-xs text-slate-600">
-                    Distance: <strong className="text-[#1d4ed8]">{activeRoute.totalDistance}m</strong> • Walking time: <strong className="text-emerald-700">~{activeRoute.estimatedMinutes} mins</strong>
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setShowQRModal(true)}
-                  className="font-l2 px-4 py-2.5 rounded-xl bg-brand-gradient text-white text-xs font-bold shadow-md flex items-center gap-1.5 transition-all transform active:scale-95 shrink-0"
-                >
-                  <QrCode className="w-4 h-4" />
-                  Scan Phone QR
-                </button>
+            <div className="text-center">
+              <p className="font-l3 text-xs uppercase font-bold text-slate-500 tracking-wider mb-2">Try Speaking These Locations</p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {[
+                  "Where is the Washroom?",
+                  "Take me to the AI Lab",
+                  "Where is HOD CSE cabin?",
+                  "How to reach Central Library?",
+                  "Where is the Food Court Canteen?"
+                ].map((cmd, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleProcessVoiceQuery(cmd)}
+                    className="font-l3 px-3 py-1.5 rounded-full bg-white hover:bg-blue-50 hover:border-blue-300 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-[#1d4ed8] transition-all shadow-sm transform active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-[#1d4ed8]" />
+                    "{cmd}"
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="text-center">
-                <p className="font-l3 text-xs uppercase font-bold text-slate-500 tracking-wider mb-2">Popular Voice Commands</p>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {[
-                    "Where is the AI Lab?",
-                    "Take me to the Library",
-                    "Where is HOD CSE office?",
-                    "Where can I get food?",
-                    "Route to Hackathon Auditorium"
-                  ].map((cmd, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleProcessVoiceQuery(cmd)}
-                      className="font-l3 px-3 py-1.5 rounded-full bg-white hover:bg-blue-50 hover:border-blue-300 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-[#1d4ed8] transition-all shadow-sm transform active:scale-95"
-                    >
-                      "{cmd}"
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </main>
 
-        {/* RIGHT 45%: Live Campus Map View (ALWAYS VISIBLE WITH GOOGLE SATELLITE & SVG TOGGLE) */}
-        <aside className="hidden lg:block w-[48%] h-full">
-          <MapRenderer activeRoute={activeRoute} />
+        {/* RIGHT 50%: LLM Voice Cockpit with Compass & Step Directions */}
+        <aside className="hidden lg:block w-[50%] h-full">
+          {activeLLMRoute ? (
+            <LLMVoiceCockpit
+              route={activeLLMRoute}
+              onArrived={() => {
+                speechService.speak(`You have arrived at ${activeLLMRoute.destinationName}`);
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-white/70 rounded-3xl border border-slate-200 p-6 text-center text-slate-400">
+              <p>Speak to start LLM Navigation...</p>
+            </div>
+          )}
         </aside>
       </div>
 
       {/* BOTTOM OF THE WINDOW: Campus Notice Cards Strip */}
-      <BottomNoticeCards onSelectDestination={handleSelectDestination} />
+      <BottomNoticeCards onSelectDestination={(_id, name) => handleProcessVoiceQuery(name)} />
 
       {/* Mobile QR Handoff Modal */}
-      {showQRModal && activeRoute && (
-        <QRCodeHandoff
-          route={activeRoute}
-          onClose={() => setShowQRModal(false)}
-        />
+      {showQRModal && activeLLMRoute && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-200 shadow-2xl text-center space-y-3">
+            <h3 className="font-l2 text-lg font-bold text-slate-900">Mobile Voice Navigation</h3>
+            <p className="text-xs text-slate-500">Scan QR code on your phone to open compass voice directions</p>
+            <div className="p-4 bg-slate-50 rounded-2xl flex items-center justify-center">
+              <QrCode className="w-32 h-32 text-blue-700" />
+            </div>
+            <button onClick={() => setShowQRModal(false)} className="px-4 py-2 rounded-xl bg-slate-100 font-bold text-xs">
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
