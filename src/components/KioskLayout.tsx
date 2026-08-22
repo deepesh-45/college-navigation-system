@@ -13,7 +13,7 @@ import { processUserVoiceQuery } from '../services/aiService';
 import { findRoute } from '../services/routeEngine';
 import { RouteResult, VoiceState } from '../types';
 
-import { Navigation, QrCode, Search, Layers, Sparkles, RefreshCw, Home } from 'lucide-react';
+import { QrCode, Search, Sparkles, RefreshCw, Home } from 'lucide-react';
 
 export const KioskLayout: React.FC = () => {
   // Mobile mode check
@@ -33,7 +33,6 @@ export const KioskLayout: React.FC = () => {
   // Active Navigation & Modals
   const [activeRoute, setActiveRoute] = useState<RouteResult | null>(null);
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
-  const [showMapModal, setShowMapModal] = useState<boolean>(false);
   const [textSearchInput, setTextSearchInput] = useState<string>('');
 
   // Handle Role Selection on First Screen (GreetingScreen)
@@ -155,9 +154,7 @@ export const KioskLayout: React.FC = () => {
             <Sparkles className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            {/* BRAND TITLE (Patua One) */}
             <h1 className="font-patua text-lg font-black tracking-wide text-slate-900">SMART CAMPUS NAV</h1>
-            {/* SUBTITLE */}
             <p className="font-l3 text-[11px] text-slate-500 font-bold tracking-wider uppercase">
               AI Kiosk • Gate 1 • <span className="text-[#1d4ed8] font-extrabold">{userRole}</span>
             </p>
@@ -188,17 +185,9 @@ export const KioskLayout: React.FC = () => {
               value={textSearchInput}
               onChange={(e) => setTextSearchInput(e.target.value)}
               placeholder="Search building, lab, faculty..."
-              className="font-l3 w-full pl-9 pr-4 py-2 rounded-xl bg-slate-100 border border-slate-300 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 transition-all shadow-inner"
+              className="font-l3 w-full pl-9 pr-4 py-2 rounded-xl bg-slate-100 border border-slate-300 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#1d4ed8] transition-all shadow-inner"
             />
           </form>
-
-          <button
-            onClick={() => setShowMapModal(true)}
-            className="font-l3 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
-          >
-            <Layers className="w-3.5 h-3.5 text-blue-600" />
-            Explore Map
-          </button>
 
           {activeRoute && (
             <button
@@ -219,13 +208,13 @@ export const KioskLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Kiosk Content Area (Full 100% Width Center Voice Experience - Static Non-Scrollable) */}
-      <div className="flex-1 flex flex-col overflow-hidden z-10">
+      {/* Main Kiosk Dashboard Area (Side-by-Side: Voice Assistant Left 55% + Live Map Right 45%) */}
+      <div className="flex-1 flex overflow-hidden z-10 p-4 gap-4">
         
-        {/* FULL 100% WIDTH CENTER AREA: Static Non-Scrollable Container */}
-        <main className="w-full flex-1 h-full flex flex-col items-center justify-between p-4 md:p-6 relative overflow-hidden select-none">
+        {/* LEFT 55%: Voice AI Assistant & Kinetic Visualizer */}
+        <main className="w-full lg:w-[52%] flex flex-col items-center justify-between p-4 relative overflow-hidden select-none bg-white/70 backdrop-blur-md rounded-3xl border border-slate-200/80 shadow-lg">
           
-          {/* Top Headline & Voice Status */}
+          {/* Headline & Voice Status */}
           <div className="w-full flex-1 flex flex-col items-center justify-center">
             <AnimatedHeadline text={headlineText} subtext={subtext} voiceState={voiceState} />
             
@@ -237,49 +226,28 @@ export const KioskLayout: React.FC = () => {
             />
           </div>
 
-          {/* Bottom Active Route Action Banner or Popular Quick Commands */}
-          <div className="w-full max-w-3xl mb-1">
+          {/* Popular Voice Suggestions or Active Route Bar */}
+          <div className="w-full max-w-xl mb-1">
             {activeRoute ? (
-              /* Active Route Found Action Box */
-              <div className="p-4 rounded-3xl glass-card-light border border-blue-200 bg-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-2xl bg-emerald-100 text-emerald-700 border border-emerald-200">
-                    <Navigation className="w-6 h-6 animate-bounce" />
-                  </div>
-                  <div>
-                    {/* LEVEL 3 FONT: Badge */}
-                    <span className="font-l3 text-[11px] uppercase font-bold text-slate-500 tracking-wider">Active Route Ready</span>
-                    {/* LEVEL 2 FONT: Title */}
-                    <h3 className="font-l2 text-lg font-bold text-slate-900">{headlineText}</h3>
-                    {/* LEVEL 3 FONT: Subtitle */}
-                    <p className="font-l3 text-xs text-slate-600 mt-0.5">
-                      Distance: <strong className="text-blue-700">{activeRoute.totalDistance}m</strong> • Walking time: <strong className="text-emerald-700">~{activeRoute.estimatedMinutes} mins</strong>
-                    </p>
-                  </div>
+              <div className="p-3.5 rounded-2xl glass-card-light border border-blue-200 bg-white shadow-md flex items-center justify-between">
+                <div>
+                  <span className="font-l3 text-[10px] uppercase font-bold text-slate-500 tracking-wider">Active Route Ready</span>
+                  <h4 className="font-l2 text-base font-bold text-slate-900">{headlineText}</h4>
+                  <p className="font-l3 text-xs text-slate-600">
+                    Distance: <strong className="text-[#1d4ed8]">{activeRoute.totalDistance}m</strong> • Walking time: <strong className="text-emerald-700">~{activeRoute.estimatedMinutes} mins</strong>
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <button
-                    onClick={() => setShowMapModal(true)}
-                    className="font-l3 flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center justify-center gap-2 border border-slate-300 transition-all shadow-sm"
-                  >
-                    <Layers className="w-4 h-4 text-blue-600" />
-                    View Map
-                  </button>
-
-                  <button
-                    onClick={() => setShowQRModal(true)}
-                    className="font-l2 flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1d4ed8] via-[#4338ca] to-[#6d28d9] hover:from-[#1e40af] hover:to-[#5b21b6] text-white text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all transform active:scale-95"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    Scan Phone QR
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowQRModal(true)}
+                  className="font-l2 px-4 py-2.5 rounded-xl bg-brand-gradient text-white text-xs font-bold shadow-md flex items-center gap-1.5 transition-all transform active:scale-95 shrink-0"
+                >
+                  <QrCode className="w-4 h-4" />
+                  Scan Phone QR
+                </button>
               </div>
             ) : (
-              /* Popular Quick Voice Suggestions */
               <div className="text-center">
-                {/* LEVEL 3 FONT: Label */}
                 <p className="font-l3 text-xs uppercase font-bold text-slate-500 tracking-wider mb-2">Popular Voice Commands</p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   {[
@@ -292,7 +260,7 @@ export const KioskLayout: React.FC = () => {
                     <button
                       key={i}
                       onClick={() => handleProcessVoiceQuery(cmd)}
-                      className="font-l3 px-3.5 py-1.5 rounded-full bg-white hover:bg-blue-50 hover:border-blue-300 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-blue-700 transition-all shadow-sm transform active:scale-95"
+                      className="font-l3 px-3 py-1.5 rounded-full bg-white hover:bg-blue-50 hover:border-blue-300 border border-slate-200 text-xs font-semibold text-slate-700 hover:text-[#1d4ed8] transition-all shadow-sm transform active:scale-95"
                     >
                       "{cmd}"
                     </button>
@@ -302,31 +270,15 @@ export const KioskLayout: React.FC = () => {
             )}
           </div>
         </main>
+
+        {/* RIGHT 45%: Live Campus Map View (ALWAYS VISIBLE WITH GOOGLE SATELLITE & SVG TOGGLE) */}
+        <aside className="hidden lg:block w-[48%] h-full">
+          <MapRenderer activeRoute={activeRoute} />
+        </aside>
       </div>
 
       {/* BOTTOM OF THE WINDOW: Campus Notice Cards Strip */}
       <BottomNoticeCards onSelectDestination={handleSelectDestination} />
-
-      {/* Interactive SVG Map Modal */}
-      {showMapModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm p-4 md:p-8 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-l2 text-xl font-bold text-white flex items-center gap-2">
-              <Layers className="w-5 h-5 text-blue-400" />
-              Full Campus SVG Map View
-            </h2>
-            <button
-              onClick={() => setShowMapModal(false)}
-              className="font-l3 px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold shadow-md"
-            >
-              Close Map
-            </button>
-          </div>
-          <div className="flex-1 w-full h-full">
-            <MapRenderer activeRoute={activeRoute} />
-          </div>
-        </div>
-      )}
 
       {/* Mobile QR Handoff Modal */}
       {showQRModal && activeRoute && (

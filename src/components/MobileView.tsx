@@ -4,6 +4,8 @@ import { gpsService, GpsPosition } from '../services/gpsService';
 import { sensorService } from '../services/sensorService';
 import { speechService } from '../services/speechService';
 import { RealCampusMap } from './RealCampusMap';
+import { GoogleCampusMap } from './GoogleCampusMap';
+import { MapRenderer } from './MapRenderer';
 import { QRCheckpointScanner } from './QRCheckpointScanner';
 import { findRoute } from '../services/routeEngine';
 import { DESTINATIONS, NAV_NODES } from '../data/campusData';
@@ -21,6 +23,7 @@ export const MobileView: React.FC<MobileViewProps> = ({ onBackToKiosk }) => {
   const [selectedStartNode, setSelectedStartNode] = useState<string>('N_KIOSK_MAIN');
   const [selectedDestId, setSelectedDestId] = useState<string>(paramDest);
   const [locationMode, setLocationMode] = useState<'gps' | 'manual'>('gps');
+  const [activeMapTab, setActiveMapTab] = useState<'google_satellite' | 'leaflet_gps' | 'svg_2d'>('google_satellite');
   
   // Navigation Route
   const [activeRoute, setActiveRoute] = useState<RouteResult | null>(null);
@@ -95,7 +98,7 @@ export const MobileView: React.FC<MobileViewProps> = ({ onBackToKiosk }) => {
           Kiosk
         </button>
 
-        <div className="font-l1 flex items-center gap-1.5 text-sm font-bold text-[#1d4ed8]">
+        <div className="font-patua flex items-center gap-1.5 text-sm font-bold text-[#1d4ed8]">
           <Smartphone className="w-4 h-4" />
           Mobile Navigation
         </div>
@@ -256,9 +259,51 @@ export const MobileView: React.FC<MobileViewProps> = ({ onBackToKiosk }) => {
           </div>
         )}
 
-        {/* Real Leaflet Map View */}
-        <div className="h-64 rounded-3xl overflow-hidden border border-slate-200 shadow-sm relative">
-          <RealCampusMap activeRoute={activeRoute} userGps={userGps} />
+        {/* MAP SECTION WITH MODE SWITCHER TABS */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase font-bold text-slate-500 tracking-wider">
+              Interactive Campus Map
+            </span>
+            <div className="flex bg-slate-200/80 p-0.5 rounded-xl gap-0.5 text-[10px] font-bold">
+              <button
+                onClick={() => setActiveMapTab('google_satellite')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  activeMapTab === 'google_satellite' ? 'bg-[#1d4ed8] text-white shadow-sm' : 'text-slate-700'
+                }`}
+              >
+                Google Sat
+              </button>
+              <button
+                onClick={() => setActiveMapTab('leaflet_gps')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  activeMapTab === 'leaflet_gps' ? 'bg-[#1d4ed8] text-white shadow-sm' : 'text-slate-700'
+                }`}
+              >
+                GPS Map
+              </button>
+              <button
+                onClick={() => setActiveMapTab('svg_2d')}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  activeMapTab === 'svg_2d' ? 'bg-[#1d4ed8] text-white shadow-sm' : 'text-slate-700'
+                }`}
+              >
+                2D SVG
+              </button>
+            </div>
+          </div>
+
+          <div className="h-72 rounded-3xl overflow-hidden border border-slate-200 shadow-md relative bg-white">
+            {activeMapTab === 'google_satellite' && (
+              <GoogleCampusMap activeRoute={activeRoute} />
+            )}
+            {activeMapTab === 'leaflet_gps' && (
+              <RealCampusMap activeRoute={activeRoute} userGps={userGps} />
+            )}
+            {activeMapTab === 'svg_2d' && (
+              <MapRenderer activeRoute={activeRoute} />
+            )}
+          </div>
         </div>
 
         {/* Step-by-Step Directions List */}
