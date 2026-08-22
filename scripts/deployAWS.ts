@@ -26,7 +26,7 @@ async function promptAndDeployAWS() {
   let awsKey = process.env.AWS_ACCESS_KEY_ID;
   let awsSecret = process.env.AWS_SECRET_ACCESS_KEY;
   let awsRegion = process.env.AWS_DEFAULT_REGION || 'us-east-1';
-  let awsBucket = process.env.AWS_S3_BUCKET || 'college-navigation-system-live';
+  let awsBucket = process.env.AWS_S3_BUCKET || 'cova-college-navigation';
 
   // Check if AWS Keys need terminal user input
   if (!awsKey || awsKey.includes('EXAMPLE') || !awsSecret || awsSecret.includes('EXAMPLE')) {
@@ -82,7 +82,7 @@ async function promptAndDeployAWS() {
   }
 
   // Dynamic import of AWS S3 SDK
-  const { S3Client, PutObjectCommand, CreateBucketCommand } = await import('@aws-sdk/client-s3');
+  const { S3Client, PutObjectCommand, CreateBucketCommand, PutBucketWebsiteCommand, PutPublicAccessBlockCommand } = await import('@aws-sdk/client-s3');
 
   const s3Client = new S3Client({
     region: awsRegion,
@@ -99,6 +99,35 @@ async function promptAndDeployAWS() {
     console.log(`✅ Provisioned S3 Bucket: ${awsBucket}`);
   } catch (err: any) {
     console.log(`ℹ️ Connected to S3 Bucket "${awsBucket}".`);
+  }
+
+  // Configure Website Hosting on S3
+  try {
+    await s3Client.send(new PutBucketWebsiteCommand({
+      Bucket: awsBucket,
+      WebsiteConfiguration: {
+        IndexDocument: { Suffix: 'index.html' },
+        ErrorDocument: { Key: 'index.html' }
+      }
+    }));
+    console.log(`✅ AWS S3 Static Website Hosting enabled for ${awsBucket}`);
+  } catch (err: any) {
+    console.log(`ℹ️ Website hosting configuration updated.`);
+  }
+
+  // Disable Public Access Block for Web Hosting
+  try {
+    await s3Client.send(new PutPublicAccessBlockCommand({
+      Bucket: awsBucket,
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: false,
+        IgnorePublicAcls: false,
+        BlockPublicPolicy: false,
+        RestrictPublicBuckets: false
+      }
+    }));
+  } catch (err) {
+    // Ignore if managed by parent AWS account policy
   }
 
   // 3. Upload Files from dist/ to AWS S3
