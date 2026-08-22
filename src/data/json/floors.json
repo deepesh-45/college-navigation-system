@@ -1,0 +1,44 @@
+[
+  {
+    "id": "F_CSE_G",
+    "buildingId": "B_CSE",
+    "floorNumber": 0,
+    "name": "CSE Block Ground Floor Lobby",
+    "mapSvg": "maps/cse-ground.svg"
+  },
+  {
+    "id": "F_CSE_1",
+    "buildingId": "B_CSE",
+    "floorNumber": 1,
+    "name": "CSE Block Floor 1 (Robotics Lab)",
+    "mapSvg": "maps/cse-floor-1.svg"
+  },
+  {
+    "id": "F_CSE_2",
+    "buildingId": "B_CSE",
+    "floorNumber": 2,
+    "name": "CSE Block Floor 2 (AI Lab & HOD Cabin)",
+    "mapSvg": "maps/cse-floor-2.svg"
+  },
+  {
+    "id": "F_ADM_G",
+    "buildingId": "B_ADMIN",
+    "floorNumber": 0,
+    "name": "Admin Block Ground Reception",
+    "mapSvg": "maps/admin-ground.svg"
+  },
+  {
+    "id": "F_LIB_G",
+    "buildingId": "B_LIBRARY",
+    "floorNumber": 0,
+    "name": "Library Main Reading Hall",
+    "mapSvg": "maps/library-ground.svg"
+  },
+  {
+    "id": "F_AUD_G",
+    "buildingId": "B_AUDITORIUM",
+    "floorNumber": 0,
+    "name": "Auditorium Main Stage Hall",
+    "mapSvg": "maps/auditorium-ground.svg"
+  }
+]

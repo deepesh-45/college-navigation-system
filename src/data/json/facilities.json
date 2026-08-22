@@ -1,0 +1,35 @@
+[
+  {
+    "id": "FACIL_FOOD",
+    "name": "Central Food Court & Coffee Lounge",
+    "category": "canteen",
+    "nodeId": "N_CANTEEN",
+    "icon": "Coffee",
+    "description": "Hot meals, snacks, smoothies, and 24-hour Nescafe counter."
+  },
+  {
+    "id": "FACIL_LIB",
+    "name": "Central Library & E-Resource Hub",
+    "category": "library",
+    "roomId": "R_LIBRARY_READING",
+    "nodeId": "N_LIBRARY",
+    "icon": "BookOpen",
+    "description": "Access over 50,000 physical books and digital IEEE database."
+  },
+  {
+    "id": "FACIL_ATM",
+    "name": "Campus ATM & Finance Desk",
+    "category": "atm",
+    "nodeId": "N_ADMIN_ENTRANCE",
+    "icon": "CreditCard",
+    "description": "SBI / HDFC 24x7 ATM counter next to Admin entrance."
+  },
+  {
+    "id": "FACIL_MED",
+    "name": "First Aid & Medical Emergency Desk",
+    "category": "medical",
+    "nodeId": "N_ADMIN_ENTRANCE",
+    "icon": "HeartPulse",
+    "description": "Resident doctor and paramedic team available on call."
+  }
+]

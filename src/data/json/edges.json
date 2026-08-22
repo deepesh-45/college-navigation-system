@@ -1,0 +1,13 @@
+[
+  { "from": "N_KIOSK_MAIN", "to": "N_JUNCTION_1", "distance": 30, "accessible": true, "stairs": false },
+  { "from": "N_JUNCTION_1", "to": "N_ADMIN_ENTRANCE", "distance": 35, "accessible": true, "stairs": false },
+  { "from": "N_JUNCTION_1", "to": "N_CANTEEN", "distance": 80, "accessible": true, "stairs": false },
+  { "from": "N_ADMIN_ENTRANCE", "to": "N_JUNCTION_CENTRAL", "distance": 45, "accessible": true, "stairs": false },
+  { "from": "N_JUNCTION_CENTRAL", "to": "N_LIBRARY", "distance": 30, "accessible": true, "stairs": false },
+  { "from": "N_JUNCTION_CENTRAL", "to": "N_JUNCTION_EAST", "distance": 75, "accessible": true, "stairs": false },
+  { "from": "N_JUNCTION_EAST", "to": "N_CSE_ENTRANCE", "distance": 20, "accessible": true, "stairs": false },
+  { "from": "N_JUNCTION_EAST", "to": "N_CANTEEN", "distance": 55, "accessible": true, "stairs": false },
+  { "from": "N_JUNCTION_EAST", "to": "N_AUDITORIUM", "distance": 85, "accessible": true, "stairs": false },
+  { "from": "N_CSE_ENTRANCE", "to": "N_CSE_F1", "distance": 15, "accessible": true, "stairs": true, "elevator": true },
+  { "from": "N_CSE_F1", "to": "N_CSE_F2", "distance": 15, "accessible": true, "stairs": true, "elevator": true }
+]

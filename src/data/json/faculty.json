@@ -1,0 +1,29 @@
+[
+  {
+    "id": "FAC_RAJESH",
+    "name": "Dr. Rajesh Kumar",
+    "title": "Professor & HOD",
+    "department": "Computer Science & Engineering",
+    "roomId": "R_HOD_CSE",
+    "email": "rajesh.kumar@college.edu",
+    "officeHours": "10:00 AM - 1:00 PM (Mon-Fri)"
+  },
+  {
+    "id": "FAC_ANANYA",
+    "name": "Dr. Ananya Sharma",
+    "title": "Associate Professor & AI Lab Lead",
+    "department": "Artificial Intelligence & Data Science",
+    "roomId": "R_AI_LAB",
+    "email": "ananya.sharma@college.edu",
+    "officeHours": "2:00 PM - 4:00 PM (Tue, Thu)"
+  },
+  {
+    "id": "FAC_VIKRAM",
+    "name": "Prof. Vikramaditya Singh",
+    "title": "Dean of Academics",
+    "department": "Administration",
+    "roomId": "R_DEAN_OFFICE",
+    "email": "dean.academics@college.edu",
+    "officeHours": "11:30 AM - 1:30 PM"
+  }
+]
