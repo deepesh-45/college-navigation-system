@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LLMRouteKnowledge, LLMStepInstruction } from '../data/llmRoutesKnowledge';
-import { Volume2, CheckCircle2, MapPin, Navigation } from 'lucide-react';
+import { Volume2, CheckCircle2, MapPin, Navigation, ArrowUp, ArrowLeft, ArrowRight, Layers, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { sensorService } from '../services/sensorService';
 import { speechService } from '../services/speechService';
 
@@ -14,55 +14,91 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [compassHeading, setCompassHeading] = useState<number>(0);
   const [segmentSteps, setSegmentSteps] = useState<number>(0);
+  const [turnDetectedBanner, setTurnDetectedBanner] = useState<string | null>(null);
 
+  const initialHeadingRef = useRef<number | null>(null);
   const activeStep: LLMStepInstruction | undefined = route.steps[currentStepIndex];
+
+  // Determine Direction Action Type from active step
+  const getActionType = (step?: LLMStepInstruction) => {
+    if (!step) return 'straight';
+    const act = (step.action || '').toLowerCase();
+    const inst = (step.instruction || '').toLowerCase();
+
+    if (act.includes('left') || inst.includes('turn left') || inst.includes('left')) return 'left';
+    if (act.includes('right') || inst.includes('turn right') || inst.includes('right')) return 'right';
+    if (act.includes('stair_up') || inst.includes('staircase up') || inst.includes('climb stairs') || inst.includes('stairs up') || inst.includes('go up')) return 'stair_up';
+    if (act.includes('stair_down') || inst.includes('staircase down') || inst.includes('descend stairs') || inst.includes('stairs down') || inst.includes('go down')) return 'stair_down';
+    if (act.includes('elevator') || inst.includes('elevator') || inst.includes('lift')) return 'elevator';
+    return 'straight';
+  };
+
+  const actionType = getActionType(activeStep);
 
   // Reset step index & accelerometer when route changes
   useEffect(() => {
     setCurrentStepIndex(0);
     sensorService.resetStepCounter();
     setSegmentSteps(0);
+    initialHeadingRef.current = null;
   }, [route.id]);
 
-  // Reset segment steps when step index (node) changes
+  // Reset segment steps & capture initial heading when step index changes
   useEffect(() => {
     sensorService.resetStepCounter();
     setSegmentSteps(0);
+    initialHeadingRef.current = null;
   }, [currentStepIndex]);
 
   // Sensor Watcher for Compass & Step Counter
   useEffect(() => {
-    sensorService.requestSensorsPermission().then((granted) => {
-      if (granted) {
-        sensorService.watchOrientation((heading) => setCompassHeading(heading));
-        sensorService.watchStepCounter((steps) => setSegmentSteps(steps));
+    return sensorService.watchOrientation((heading) => {
+      setCompassHeading(heading);
+
+      if (initialHeadingRef.current === null) {
+        initialHeadingRef.current = heading;
+      } else {
+        // Automatic Relative Turn Deviation Detection (60° turn deviation threshold)
+        const deviation = Math.abs((heading - initialHeadingRef.current + 540) % 360 - 180);
+        if (deviation >= 50 && (actionType === 'left' || actionType === 'right')) {
+          initialHeadingRef.current = heading; // lock new heading
+          sensorService.triggerHapticFeedback([100, 50, 100]);
+          setTurnDetectedBanner(`Turn Detected! (${Math.round(deviation)}°)`);
+          setTimeout(() => setTurnDetectedBanner(null), 2500);
+        }
       }
     });
+  }, [actionType]);
+
+  useEffect(() => {
+    return sensorService.watchStepCounter((steps) => setSegmentSteps(steps));
   }, []);
 
   // Automatic Altitude & Floor Change Detection at Staircase/Elevator Nodes
   useEffect(() => {
     const stopAltitudeWatcher = sensorService.watchAltitudeFloorChange((direction) => {
-      if (activeStep && (activeStep.instruction.toLowerCase().includes('stair') || activeStep.instruction.toLowerCase().includes('floor') || activeStep.instruction.toLowerCase().includes('elevator'))) {
-        sensorService.triggerHapticFeedback([100, 50, 100]);
-        speechService.speak(`Floor altitude change detected ${direction}. Advancing to next node.`);
+      if (actionType === 'stair_up' || actionType === 'stair_down' || actionType === 'elevator') {
+        sensorService.triggerHapticFeedback([120, 60, 120]);
+        speechService.speak(`Floor altitude change detected ${direction}. Advancing to next step.`);
+        setTurnDetectedBanner(`Stairs ${direction.toUpperCase()} Motion Detected!`);
+        setTimeout(() => setTurnDetectedBanner(null), 2500);
         handleNextStep();
       }
     });
 
     return () => stopAltitudeWatcher();
-  }, [currentStepIndex, activeStep]);
+  }, [currentStepIndex, actionType]);
 
   // Speak active node step voice prompt
   useEffect(() => {
     if (isNavigating && activeStep) {
-      speechService.speak(`Node ${activeStep.stepNumber}: ${activeStep.voicePrompt}`);
+      speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt}`);
     }
   }, [currentStepIndex, activeStep, isNavigating]);
 
   const handleSpeakCurrentStep = () => {
     if (activeStep) {
-      speechService.speak(`Node ${activeStep.stepNumber}: ${activeStep.voicePrompt}`);
+      speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt}`);
     }
   };
 
@@ -70,6 +106,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
     sensorService.triggerHapticFeedback([60]);
     sensorService.resetStepCounter();
     setSegmentSteps(0);
+    initialHeadingRef.current = null;
 
     if (currentStepIndex < route.steps.length - 1) {
       setCurrentStepIndex(prev => prev + 1);
@@ -83,10 +120,10 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
   const handlePreviousStep = () => {
     sensorService.resetStepCounter();
     setSegmentSteps(0);
+    initialHeadingRef.current = null;
     setCurrentStepIndex(prev => Math.max(0, prev - 1));
   };
 
-  // Rotating Dial Angle (-compassHeading so the dial rotates under the fixed top pin)
   const dialRotationAngle = (360 - compassHeading) % 360;
 
   return (
@@ -96,7 +133,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
       <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500 bg-slate-200/70 px-2 py-0.5 rounded-full">
-            Node {currentStepIndex + 1} of {route.steps.length}
+            Step {currentStepIndex + 1} of {route.steps.length}
           </span>
           <button
             onClick={handleSpeakCurrentStep}
@@ -124,69 +161,105 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
         )}
       </div>
 
-      {/* CENTERED ROTATING 360° COMPASS DIAL WITH FIXED TOP POINTER PIN */}
-      <div className="flex-1 flex flex-col items-center justify-center space-y-2 my-auto">
+      {/* PROMINENT DIRECTION ACTION BADGE & RELATIVE COMPASS */}
+      <div className="flex-1 flex flex-col items-center justify-center space-y-2.5 my-auto">
         
-        {/* COMPASS CONTAINER */}
-        <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-full bg-slate-900 border-4 border-blue-600 shadow-2xl flex items-center justify-center shrink-0 p-1">
+        {/* AUTOMATIC TURN DETECTED SENSOR BANNER */}
+        {turnDetectedBanner && (
+          <div className="px-3 py-1 rounded-full bg-emerald-600 text-white font-black text-[10px] shadow-lg animate-bounce flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>{turnDetectedBanner}</span>
+          </div>
+        )}
+
+        {/* BIG DIRECTION ACTION BADGE */}
+        <div className="w-full max-w-xs flex items-center justify-center">
+          {actionType === 'left' && (
+            <div className="w-full p-2.5 rounded-xl bg-amber-500 text-white shadow-md flex items-center justify-center gap-2">
+              <ArrowLeft className="w-6 h-6 animate-pulse" />
+              <span className="font-black text-sm uppercase tracking-wide">TURN LEFT</span>
+            </div>
+          )}
+
+          {actionType === 'right' && (
+            <div className="w-full p-2.5 rounded-xl bg-amber-500 text-white shadow-md flex items-center justify-center gap-2">
+              <span className="font-black text-sm uppercase tracking-wide">TURN RIGHT</span>
+              <ArrowRight className="w-6 h-6 animate-pulse" />
+            </div>
+          )}
+
+          {actionType === 'straight' && (
+            <div className="w-full p-2.5 rounded-xl bg-blue-600 text-white shadow-md flex items-center justify-center gap-2">
+              <ArrowUp className="w-6 h-6 animate-pulse" />
+              <span className="font-black text-sm uppercase tracking-wide">WALK STRAIGHT</span>
+            </div>
+          )}
+
+          {actionType === 'stair_up' && (
+            <div className="w-full p-2.5 rounded-xl bg-indigo-600 text-white shadow-md flex items-center justify-center gap-2">
+              <ArrowUpRight className="w-6 h-6 animate-bounce" />
+              <span className="font-black text-sm uppercase tracking-wide">CLIMB STAIRS UP 🪜</span>
+            </div>
+          )}
+
+          {actionType === 'stair_down' && (
+            <div className="w-full p-2.5 rounded-xl bg-purple-600 text-white shadow-md flex items-center justify-center gap-2">
+              <ArrowDownRight className="w-6 h-6 animate-bounce" />
+              <span className="font-black text-sm uppercase tracking-wide">GO STAIRS DOWN 🪜</span>
+            </div>
+          )}
+
+          {actionType === 'elevator' && (
+            <div className="w-full p-2.5 rounded-xl bg-cyan-600 text-white shadow-md flex items-center justify-center gap-2">
+              <Layers className="w-6 h-6 animate-pulse" />
+              <span className="font-black text-sm uppercase tracking-wide">TAKE ELEVATOR 🛗</span>
+            </div>
+          )}
+        </div>
+
+        {/* RELATIVE TURN DEVIATION COMPASS DIAL */}
+        <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-slate-900 border-4 border-blue-600 shadow-xl flex items-center justify-center shrink-0 p-1">
           
-          {/* FIXED TOP HEADING POINTER PIN (Always points down at current degree under 12 o'clock) */}
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
-            <div className="w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[16px] border-t-rose-600 drop-shadow-md" />
+          {/* FIXED TOP HEADING POINTER PIN */}
+          <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
+            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[14px] border-t-rose-600 drop-shadow" />
           </div>
 
-          {/* ROTATING COMPASS DIAL WHEEL (Rotates by -compassHeading) */}
+          {/* ROTATING COMPASS DIAL WHEEL */}
           <div
             className="w-full h-full rounded-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border border-slate-700/80 relative flex items-center justify-center transition-transform duration-300 pointer-events-none"
             style={{ transform: `rotate(${dialRotationAngle}deg)` }}
           >
-            {/* North 0° Marker in Bright Red */}
+            {/* North 0° Marker */}
             <div className="absolute top-1 flex flex-col items-center">
-              <span className="text-[11px] font-black text-rose-500 tracking-wider">N</span>
-              <span className="text-[7px] font-extrabold text-rose-400">0°</span>
+              <span className="text-[10px] font-black text-rose-500">N</span>
             </div>
-
             {/* East 90° Marker */}
-            <div className="absolute right-1.5 flex items-center gap-0.5">
-              <span className="text-[10px] font-black text-slate-300">E</span>
-              <span className="text-[7px] font-bold text-slate-400">90°</span>
+            <div className="absolute right-1.5 flex items-center">
+              <span className="text-[9px] font-black text-slate-300">E</span>
             </div>
-
             {/* South 180° Marker */}
             <div className="absolute bottom-1 flex flex-col items-center">
-              <span className="text-[7px] font-bold text-slate-400">180°</span>
-              <span className="text-[10px] font-black text-slate-300">S</span>
+              <span className="text-[9px] font-black text-slate-300">S</span>
             </div>
-
             {/* West 270° Marker */}
-            <div className="absolute left-1.5 flex items-center gap-0.5">
-              <span className="text-[7px] font-bold text-slate-400">270°</span>
-              <span className="text-[10px] font-black text-slate-300">W</span>
+            <div className="absolute left-1.5 flex items-center">
+              <span className="text-[9px] font-black text-slate-300">W</span>
             </div>
-
-            {/* TARGET TURN DIRECTION BEACON (Positioned on the rotating compass dial) */}
-            {activeStep && (
-              <div
-                className="absolute w-full h-full flex items-center justify-center transition-transform duration-500 z-10"
-                style={{ transform: `rotate(${activeStep.headingDegrees}deg)` }}
-              >
-                <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white shadow-lg -translate-y-13 sm:-translate-y-16 animate-ping" />
-              </div>
-            )}
           </div>
 
-          {/* CENTER HEADING BADGE */}
-          <div className="absolute w-12 h-12 rounded-full bg-slate-950 border-2 border-blue-500 shadow-md flex flex-col items-center justify-center text-white z-20 pointer-events-none">
-            <span className="text-[11px] font-black text-emerald-400 leading-none">{compassHeading}°</span>
-            <span className="text-[7px] font-extrabold text-slate-400 uppercase tracking-tighter mt-0.5">Heading</span>
+          {/* CENTER STEP HEADING BADGE */}
+          <div className="absolute w-11 h-11 rounded-full bg-slate-950 border-2 border-blue-500 shadow-md flex flex-col items-center justify-center text-white z-20 pointer-events-none">
+            <span className="text-[10px] font-black text-emerald-400 leading-none">{compassHeading}°</span>
+            <span className="text-[6.5px] font-extrabold text-slate-400 uppercase tracking-tighter mt-0.5">Turn Dev</span>
           </div>
         </div>
 
-        {/* SEGMENT ACCELEROMETER STEP COUNTER */}
+        {/* ACCELEROMETER STEP COUNTER */}
         <div className="w-full text-center bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-sm max-w-xs">
           <div className="flex items-center justify-center gap-1.5 text-[9px] sm:text-[10px] font-extrabold uppercase text-slate-500">
             <Navigation className="w-3 h-3 text-[#1d4ed8]" />
-            <span>Steps Walked for Node:</span>
+            <span>Steps Walked:</span>
           </div>
           <span className="text-xl sm:text-2xl font-black text-[#1d4ed8] block leading-tight">{segmentSteps} steps</span>
           <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 block truncate">

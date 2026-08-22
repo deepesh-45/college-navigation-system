@@ -5,6 +5,7 @@ export interface LLMStepInstruction {
   headingText: string;
   stepsCount: number;
   landmarkHint?: string;
+  action?: 'straight' | 'left' | 'right' | 'stair_up' | 'stair_down' | 'elevator';
   voicePrompt: string;
 }
 
