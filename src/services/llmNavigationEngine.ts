@@ -1,14 +1,18 @@
 import { LLM_ROUTES_KNOWLEDGE, LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
+import { CAMPUS_NODES } from '../data/campusGraphData';
+import { findNodeByIdOrAlias, generateRoutePermutationFromGraph } from './graphRouteEngine';
 
 export interface LLMNavigationResult {
   matched: boolean;
+  isAmbiguous?: boolean;
+  ambiguousMatches?: LLMRouteKnowledge[];
   isNearbyLandmarkFallback?: boolean;
   nearbyLandmarkName?: string;
   route: LLMRouteKnowledge | null;
   responseMessage: string;
 }
 
-export const resolveLLMVoiceQuery = (query: string): LLMNavigationResult => {
+export const resolveLLMVoiceQuery = (query: string, customStartName?: string): LLMNavigationResult => {
   const normalized = query.toLowerCase().trim();
 
   if (!normalized) {
@@ -19,77 +23,69 @@ export const resolveLLMVoiceQuery = (query: string): LLMNavigationResult => {
     };
   }
 
-  // 1. Direct alias match search
+  // 1. Try Graph Shortest Path Permutation Engine
+  const startNode = findNodeByIdOrAlias(customStartName || 'main entrance') || CAMPUS_NODES[0];
+  const destNode = findNodeByIdOrAlias(query);
+
+  if (destNode && startNode.id !== destNode.id) {
+    const graphRoute = generateRoutePermutationFromGraph(startNode, destNode);
+    if (graphRoute) {
+      return {
+        matched: true,
+        isAmbiguous: false,
+        isNearbyLandmarkFallback: false,
+        route: graphRoute,
+        responseMessage: `Generated optimal route from ${startNode.name} to ${destNode.name}! Total ${graphRoute.totalSteps} steps (${graphRoute.totalDistanceMeters}m walk).`
+      };
+    }
+  }
+
+  // 2. Search all matching static LLM routes for ambiguity or direct match
+  const matchingRoutes: LLMRouteKnowledge[] = [];
+
   for (const route of LLM_ROUTES_KNOWLEDGE) {
-    for (const alias of route.aliases) {
-      if (normalized.includes(alias)) {
-        return {
-          matched: true,
-          isNearbyLandmarkFallback: false,
-          route,
-          responseMessage: `Found route to ${route.destinationName}! ${route.overviewSummary}`
-        };
+    const isNameMatch = route.destinationName.toLowerCase().includes(normalized);
+    const isCategoryMatch = route.category.toLowerCase().includes(normalized);
+    const isAliasMatch = route.aliases.some(a => a.toLowerCase().includes(normalized) || normalized.includes(a.toLowerCase()));
+
+    if (isNameMatch || isCategoryMatch || isAliasMatch) {
+      if (!matchingRoutes.some(r => r.id === route.id)) {
+        matchingRoutes.push(route);
       }
     }
   }
 
-  // 2. Category Keyword Matching
-  if (normalized.includes('washroom') || normalized.includes('toilet') || normalized.includes('restroom')) {
-    const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'washroom') || LLM_ROUTES_KNOWLEDGE[0];
+  // 3. Ambiguity Detection: If multiple routes match
+  if (matchingRoutes.length > 1) {
+    const destinationNames = matchingRoutes.map(r => r.destinationName).join(' OR ');
     return {
       matched: true,
-      isNearbyLandmarkFallback: false,
-      route,
-      responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
+      isAmbiguous: true,
+      ambiguousMatches: matchingRoutes,
+      route: matchingRoutes[0],
+      responseMessage: `⚠️ Ambiguous Destination: Multiple locations match "${query}". Did you mean ${destinationNames}? Please select below or speak your exact choice.`
     };
   }
 
-  if (normalized.includes('lab') || normalized.includes('ai') || normalized.includes('robotics')) {
-    const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'lab') || LLM_ROUTES_KNOWLEDGE[1];
+  // 4. Single Direct Match
+  if (matchingRoutes.length === 1) {
+    const route = matchingRoutes[0];
     return {
       matched: true,
+      isAmbiguous: false,
       isNearbyLandmarkFallback: false,
       route,
-      responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
+      responseMessage: `Found route to ${route.destinationName}! ${route.overviewSummary}`
     };
   }
 
-  if (normalized.includes('hod') || normalized.includes('rajesh') || normalized.includes('cabin') || normalized.includes('office')) {
-    const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'cabin') || LLM_ROUTES_KNOWLEDGE[2];
-    return {
-      matched: true,
-      isNearbyLandmarkFallback: false,
-      route,
-      responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
-    };
-  }
-
-  if (normalized.includes('library') || normalized.includes('book') || normalized.includes('study')) {
-    const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'facility') || LLM_ROUTES_KNOWLEDGE[3];
-    return {
-      matched: true,
-      isNearbyLandmarkFallback: false,
-      route,
-      responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
-    };
-  }
-
-  if (normalized.includes('food') || normalized.includes('canteen') || normalized.includes('eat') || normalized.includes('coffee')) {
-    const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'canteen') || LLM_ROUTES_KNOWLEDGE[4];
-    return {
-      matched: true,
-      isNearbyLandmarkFallback: false,
-      route,
-      responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
-    };
-  }
-
-  // 3. Fallback: Direct route not found -> Guide user to Nearby Landmark Point!
+  // 5. Fallback: Direct route not found -> Guide user to Nearby Landmark Point!
   const fallbackRoute = LLM_ROUTES_KNOWLEDGE[0];
   const nearbyLandmark = fallbackRoute.startPoint; // e.g. "CSE Block Main Entrance Lobby"
 
   return {
     matched: true,
+    isAmbiguous: false,
     isNearbyLandmarkFallback: true,
     nearbyLandmarkName: nearbyLandmark,
     route: fallbackRoute,

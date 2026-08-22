@@ -1,86 +1,44 @@
-import fs from 'fs';
-import path from 'path';
-
-interface Building { id: string; name: string; }
-interface Floor { id: string; buildingId: string; }
-interface Room { id: string; buildingId: string; floorId: string; nodeId: string; }
-interface Faculty { id: string; roomId: string; }
-interface NavNode { id: string; buildingId?: string; floorId: string; }
-interface NavEdge { from: string; to: string; }
+import { CAMPUS_NODES, CAMPUS_EDGES } from '../src/data/campusGraphData';
+import { LLM_ROUTES_KNOWLEDGE } from '../src/data/llmRoutesKnowledge';
 
 function validateCampusDatabase() {
-  console.log('🔍 Starting Smart Campus Dataset Validation...');
-  const jsonDir = path.join(process.cwd(), 'src', 'data', 'json');
+  console.log('🔍 Starting Smart Campus Graph & LLM Dataset Validation...');
 
-  const buildings: Building[] = JSON.parse(fs.readFileSync(path.join(jsonDir, 'buildings.json'), 'utf-8'));
-  const floors: Floor[] = JSON.parse(fs.readFileSync(path.join(jsonDir, 'floors.json'), 'utf-8'));
-  const rooms: Room[] = JSON.parse(fs.readFileSync(path.join(jsonDir, 'rooms.json'), 'utf-8'));
-  const faculty: Faculty[] = JSON.parse(fs.readFileSync(path.join(jsonDir, 'faculty.json'), 'utf-8'));
-  const nodes: NavNode[] = JSON.parse(fs.readFileSync(path.join(jsonDir, 'nodes.json'), 'utf-8'));
-  const edges: NavEdge[] = JSON.parse(fs.readFileSync(path.join(jsonDir, 'edges.json'), 'utf-8'));
-
-  const buildingIds = new Set(buildings.map(b => b.id));
-  const floorIds = new Set(floors.map(f => f.id));
-  const nodeIds = new Set(nodes.map(n => n.id));
-  const roomIds = new Set(rooms.map(r => r.id));
-
+  const nodeIds = new Set(CAMPUS_NODES.map(n => n.id));
   let errors = 0;
 
-  // 1. Check Floor -> Building FK
-  floors.forEach(f => {
-    if (!buildingIds.has(f.buildingId)) {
-      console.error(`❌ Floor "${f.id}" references invalid buildingId: ${f.buildingId}`);
+  // 1. Check Graph Edges Node FK integrity
+  CAMPUS_EDGES.forEach(e => {
+    if (!nodeIds.has(e.fromNodeId)) {
+      console.error(`❌ Edge "${e.id}" references invalid fromNodeId: ${e.fromNodeId}`);
+      errors++;
+    }
+    if (!nodeIds.has(e.toNodeId)) {
+      console.error(`❌ Edge "${e.id}" references invalid toNodeId: ${e.toNodeId}`);
+      errors++;
+    }
+    if (e.stepsCount < 0) {
+      console.error(`❌ Edge "${e.id}" has invalid negative stepsCount: ${e.stepsCount}`);
       errors++;
     }
   });
 
-  // 2. Check Room -> Building & Floor & Node FK
-  rooms.forEach(r => {
-    if (!buildingIds.has(r.buildingId)) {
-      console.error(`❌ Room "${r.id}" references invalid buildingId: ${r.buildingId}`);
-      errors++;
-    }
-    if (!floorIds.has(r.floorId)) {
-      console.error(`❌ Room "${r.id}" references invalid floorId: ${r.floorId}`);
-      errors++;
-    }
-    if (!nodeIds.has(r.nodeId)) {
-      console.error(`❌ Room "${r.id}" references invalid nodeId: ${r.nodeId}`);
-      errors++;
-    }
-  });
-
-  // 3. Check Faculty -> Room FK
-  faculty.forEach(fac => {
-    if (!roomIds.has(fac.roomId)) {
-      console.error(`❌ Faculty "${fac.id}" references invalid roomId: ${fac.roomId}`);
-      errors++;
-    }
-  });
-
-  // 4. Check Edges -> Node FK
-  edges.forEach(e => {
-    if (!nodeIds.has(e.from)) {
-      console.error(`❌ Edge from "${e.from}" references non-existent node`);
-      errors++;
-    }
-    if (!nodeIds.has(e.to)) {
-      console.error(`❌ Edge to "${e.to}" references non-existent node`);
+  // 2. Check LLM Routes Integrity
+  LLM_ROUTES_KNOWLEDGE.forEach(r => {
+    if (!r.steps || r.steps.length === 0) {
+      console.error(`❌ Route "${r.id}" has 0 step instructions`);
       errors++;
     }
   });
 
   if (errors > 0) {
-    console.error(`\nFAILED: Found ${errors} database validation errors.`);
+    console.error(`\nFAILED: Found ${errors} dataset validation errors.`);
     process.exit(1);
   } else {
-    console.log(`\n✅ PASSED: Campus Dataset is 100% valid!`);
-    console.log(`  - Buildings: ${buildings.length}`);
-    console.log(`  - Floors: ${floors.length}`);
-    console.log(`  - Rooms: ${rooms.length}`);
-    console.log(`  - Faculty: ${faculty.length}`);
-    console.log(`  - Graph Nodes: ${nodes.length}`);
-    console.log(`  - Graph Edges: ${edges.length}`);
+    console.log(`\n✅ PASSED: Campus Graph & LLM Dataset is 100% valid!`);
+    console.log(`  - Atomic Graph Nodes: ${CAMPUS_NODES.length}`);
+    console.log(`  - Directional Graph Edges: ${CAMPUS_EDGES.length}`);
+    console.log(`  - LLM Knowledge Routes: ${LLM_ROUTES_KNOWLEDGE.length}`);
   }
 }
 
