@@ -53,13 +53,13 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
   // Speak active step voice prompt
   useEffect(() => {
     if (isNavigating && activeStep) {
-      speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt}`);
+      speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt || activeStep.instruction}`);
     }
   }, [currentStepIndex, activeStep, isNavigating]);
 
   const handleSpeakCurrentStep = () => {
     if (activeStep) {
-      speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt}`);
+      speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt || activeStep.instruction}`);
     }
   };
 
@@ -85,11 +85,17 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
 
   const targetSteps = activeStep?.stepsCount || 20;
   const stepProgress = Math.min(100, Math.round((segmentSteps / targetSteps) * 100));
+  const isLastStep = currentStepIndex === route.steps.length - 1;
+
+  // Format standard instruction prompt (e.g., "Move straight approx 30 steps and turn right")
+  const standardInstructionPrompt = activeStep
+    ? activeStep.instruction
+    : "Move straight approx 20 steps to reach destination.";
 
   return (
     <div className="w-full flex-1 flex flex-col justify-between rounded-2xl p-3 sm:p-4 border border-slate-200 shadow-md bg-white/95 backdrop-blur-md font-l3 space-y-3 overflow-hidden">
       
-      {/* HEADER NODE INSTRUCTION & READ ALOUD BUTTON */}
+      {/* HEADER STEP CARD WITH READ ALOUD */}
       <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600 bg-slate-200/80 px-2.5 py-0.5 rounded-full">
@@ -104,39 +110,31 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
           </button>
         </div>
 
-        {/* Instruction */}
-        {activeStep && (
-          <div className="space-y-1.5">
-            <h4 className="font-l2 text-sm sm:text-base font-black text-slate-900 leading-snug line-clamp-2">
-              "{activeStep.instruction}"
-            </h4>
-
-            {activeStep.landmarkHint && (
-              <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-200 shadow-sm truncate">
-                <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="truncate">Landmark: {activeStep.landmarkHint}</span>
-              </div>
-            )}
+        {/* Landmark Hint */}
+        {activeStep?.landmarkHint && (
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 bg-white p-2 rounded-lg border border-slate-200 shadow-sm truncate">
+            <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="truncate">Landmark: {activeStep.landmarkHint}</span>
           </div>
         )}
       </div>
 
-      {/* INTERACTIVE CLICKABLE DIRECTION ACTION CARD BUTTON (COMPLETES STEP ON CLICK) */}
+      {/* CENTERED STANDARDIZED STEP ACTION CARD */}
       <div className="flex-1 flex flex-col items-center justify-center space-y-3.5 my-auto">
         
-        {/* CLICKABLE DIRECTION ACTION CARD BUTTON */}
+        {/* CLICKABLE STANDARDIZED ACTION BANNER BUTTON */}
         <div className="w-full max-w-sm">
           {actionType === 'left' && (
             <button
               onClick={handleNextStep}
-              className="w-full p-4 sm:p-5 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-amber-400 cursor-pointer group"
+              className="w-full p-4 sm:p-5 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2.5 border-2 border-amber-400 cursor-pointer group"
             >
               <ArrowLeft className="w-10 h-10 animate-pulse group-hover:scale-110 transition-transform" />
-              <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
-                TURN LEFT AFTER {targetSteps} STEPS
+              <span className="font-black text-base sm:text-lg uppercase tracking-wide leading-tight">
+                "{standardInstructionPrompt}"
               </span>
               <span className="text-xs font-black bg-amber-600 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
-                👉 Tap to Complete Step & Continue ➔
+                👉 Tap Step Completed to Continue ➔
               </span>
             </button>
           )}
@@ -144,14 +142,14 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
           {actionType === 'right' && (
             <button
               onClick={handleNextStep}
-              className="w-full p-4 sm:p-5 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-amber-400 cursor-pointer group"
+              className="w-full p-4 sm:p-5 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2.5 border-2 border-amber-400 cursor-pointer group"
             >
               <ArrowRight className="w-10 h-10 animate-pulse group-hover:scale-110 transition-transform" />
-              <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
-                TURN RIGHT AFTER {targetSteps} STEPS
+              <span className="font-black text-base sm:text-lg uppercase tracking-wide leading-tight">
+                "{standardInstructionPrompt}"
               </span>
               <span className="text-xs font-black bg-amber-600 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
-                👉 Tap to Complete Step & Continue ➔
+                👉 Tap Step Completed to Continue ➔
               </span>
             </button>
           )}
@@ -159,14 +157,14 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
           {actionType === 'straight' && (
             <button
               onClick={handleNextStep}
-              className="w-full p-4 sm:p-5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-blue-500 cursor-pointer group"
+              className="w-full p-4 sm:p-5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2.5 border-2 border-blue-500 cursor-pointer group"
             >
               <ArrowUp className="w-10 h-10 animate-pulse group-hover:scale-110 transition-transform" />
-              <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
-                WALK STRAIGHT FOR {targetSteps} STEPS
+              <span className="font-black text-base sm:text-lg uppercase tracking-wide leading-tight">
+                "{standardInstructionPrompt}"
               </span>
               <span className="text-xs font-black bg-blue-800 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
-                👉 Tap to Complete Step & Continue ➔
+                👉 Tap Step Completed to Continue ➔
               </span>
             </button>
           )}
@@ -174,14 +172,14 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
           {actionType === 'stair_up' && (
             <button
               onClick={handleNextStep}
-              className="w-full p-4 sm:p-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-indigo-500 cursor-pointer group"
+              className="w-full p-4 sm:p-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2.5 border-2 border-indigo-500 cursor-pointer group"
             >
               <ArrowUpRight className="w-10 h-10 animate-bounce group-hover:scale-110 transition-transform" />
-              <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
-                CLIMB STAIRS UP 🪜
+              <span className="font-black text-base sm:text-lg uppercase tracking-wide leading-tight">
+                "{standardInstructionPrompt}"
               </span>
               <span className="text-xs font-black bg-indigo-800 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
-                👉 Tap to Complete Floor Climb & Continue ➔
+                👉 Tap Step Completed to Continue ➔
               </span>
             </button>
           )}
@@ -189,14 +187,14 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
           {actionType === 'stair_down' && (
             <button
               onClick={handleNextStep}
-              className="w-full p-4 sm:p-5 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-purple-500 cursor-pointer group"
+              className="w-full p-4 sm:p-5 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2.5 border-2 border-purple-500 cursor-pointer group"
             >
               <ArrowDownRight className="w-10 h-10 animate-bounce group-hover:scale-110 transition-transform" />
-              <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
-                GO STAIRS DOWN 🪜
+              <span className="font-black text-base sm:text-lg uppercase tracking-wide leading-tight">
+                "{standardInstructionPrompt}"
               </span>
               <span className="text-xs font-black bg-purple-800 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
-                👉 Tap to Complete Floor Descent & Continue ➔
+                👉 Tap Step Completed to Continue ➔
               </span>
             </button>
           )}
@@ -204,14 +202,14 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
           {actionType === 'elevator' && (
             <button
               onClick={handleNextStep}
-              className="w-full p-4 sm:p-5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-cyan-500 cursor-pointer group"
+              className="w-full p-4 sm:p-5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2.5 border-2 border-cyan-500 cursor-pointer group"
             >
               <Layers className="w-10 h-10 animate-pulse group-hover:scale-110 transition-transform" />
-              <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
-                TAKE ELEVATOR 🛗
+              <span className="font-black text-base sm:text-lg uppercase tracking-wide leading-tight">
+                "{standardInstructionPrompt}"
               </span>
               <span className="text-xs font-black bg-cyan-800 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
-                👉 Tap to Complete Elevator Ride & Continue ➔
+                👉 Tap Step Completed to Continue ➔
               </span>
             </button>
           )}
@@ -222,7 +220,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-black uppercase text-slate-700">
               <Footprints className="w-4 h-4 text-[#1d4ed8]" />
-              <span>Step Counter Progress:</span>
+              <span>Step Footstep Progress:</span>
             </div>
             <span className="text-xs font-black text-[#1d4ed8]">{segmentSteps} / {targetSteps} steps</span>
           </div>
@@ -237,7 +235,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
         </div>
       </div>
 
-      {/* STEP NAVIGATION FOOTER CONTROLS */}
+      {/* FOOTER STEP COMPLETION BUTTON */}
       <div className="flex items-center justify-between gap-2.5">
         <button
           disabled={currentStepIndex === 0}
@@ -247,7 +245,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
           Previous
         </button>
 
-        {currentStepIndex < route.steps.length - 1 ? (
+        {!isLastStep ? (
           <button
             onClick={handleNextStep}
             className="flex-1 py-3 px-4 rounded-xl bg-brand-gradient text-white font-black text-xs sm:text-sm shadow-lg flex items-center justify-center gap-1.5 transform active:scale-95 transition-all"
@@ -260,7 +258,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
             className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow-lg flex items-center justify-center gap-1.5 transform active:scale-95 transition-all"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>Arrived at Destination! 🎉</span>
+            <span>Arrived at Destination! Finish 🎉</span>
           </button>
         )}
       </div>

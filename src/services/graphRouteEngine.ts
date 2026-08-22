@@ -23,6 +23,30 @@ export const findNodeByIdOrAlias = (query: string): GraphNode | null => {
   return null;
 };
 
+// Format Standardized Gemini AI Step Prompt
+export const formatStandardStepInstruction = (
+  stepsCount: number,
+  action: 'straight' | 'left' | 'right' | 'stair_up' | 'stair_down' | 'elevator' | 'arrive',
+  landmarkHint?: string
+): string => {
+  let actionText = '';
+  switch (action) {
+    case 'left': actionText = 'turn left'; break;
+    case 'right': actionText = 'turn right'; break;
+    case 'stair_up': actionText = 'take stairs up'; break;
+    case 'stair_down': actionText = 'take stairs down'; break;
+    case 'elevator': actionText = 'take elevator'; break;
+    case 'arrive': actionText = 'reach destination'; break;
+    default: actionText = 'continue straight'; break;
+  }
+
+  let prompt = `Move straight approx ${stepsCount} steps and ${actionText}.`;
+  if (landmarkHint) {
+    prompt += ` (Landmark: ${landmarkHint})`;
+  }
+  return prompt;
+};
+
 // Dijkstra's Shortest Path Algorithm over Extracted Graph
 export const calculateShortestGraphPath = (startNodeId: string, destNodeId: string): GraphEdge[] | null => {
   if (startNodeId === destNodeId) return [];
@@ -80,7 +104,7 @@ export const calculateShortestGraphPath = (startNodeId: string, destNodeId: stri
   return pathEdges.length > 0 ? pathEdges : null;
 };
 
-// Synthesizes a graph path into an LLMRouteKnowledge route permutation
+// Synthesizes a graph path into a standardized step-by-step LLMRouteKnowledge
 export const generateRoutePermutationFromGraph = (
   startNode: GraphNode,
   destNode: GraphNode
@@ -91,14 +115,36 @@ export const generateRoutePermutationFromGraph = (
   let totalSteps = 0;
   const steps: LLMStepInstruction[] = edges.map((edge, index) => {
     totalSteps += edge.stepsCount;
+    const isLast = index === edges.length - 1;
+
+    let actionType: 'straight' | 'left' | 'right' | 'stair_up' | 'stair_down' | 'elevator' | 'arrive' = 'straight';
+    const inst = edge.instruction.toLowerCase();
+
+    if (isLast) {
+      actionType = 'arrive';
+    } else if (inst.includes('left')) {
+      actionType = 'left';
+    } else if (inst.includes('right')) {
+      actionType = 'right';
+    } else if (inst.includes('staircase up') || inst.includes('stairs up') || inst.includes('climb stairs')) {
+      actionType = 'stair_up';
+    } else if (inst.includes('staircase down') || inst.includes('stairs down')) {
+      actionType = 'stair_down';
+    } else if (inst.includes('elevator')) {
+      actionType = 'elevator';
+    }
+
+    const standardPrompt = formatStandardStepInstruction(edge.stepsCount, actionType, edge.landmarkHint);
+
     return {
       stepNumber: index + 1,
-      instruction: edge.instruction,
+      instruction: standardPrompt,
       headingDegrees: edge.headingDegrees,
       headingText: edge.headingText,
       stepsCount: edge.stepsCount,
       landmarkHint: edge.landmarkHint,
-      voicePrompt: edge.instruction
+      action: actionType === 'arrive' ? 'straight' : actionType,
+      voicePrompt: standardPrompt
     };
   });
 
@@ -112,7 +158,7 @@ export const generateRoutePermutationFromGraph = (
     floor: destNode.floor,
     totalSteps,
     totalDistanceMeters: Math.round(totalSteps * 0.75),
-    overviewSummary: `Route from ${startNode.name} to ${destNode.name} in ${steps.length} turns (${totalSteps} steps).`,
+    overviewSummary: `Step-by-step route from ${startNode.name} to ${destNode.name} (${steps.length} steps, ${totalSteps} total footsteps).`,
     steps
   };
 };
