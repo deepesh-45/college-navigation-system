@@ -24,7 +24,7 @@ export class SensorService {
     return true; // Non-iOS or permission already available
   }
 
-  // Watch Device Orientation Compass Heading with Smooth Low-Pass Filtering
+  // Watch Device Orientation Compass Heading with Smooth Low-Pass Filtering & 180° Inversion Alignment
   public watchOrientation(onHeadingUpdate: (heading: number) => void): () => void {
     const handleOrientation = (event: DeviceOrientationEventiOS) => {
       let rawHeading: number | null = null;
@@ -36,7 +36,8 @@ export class SensorService {
       }
 
       if (rawHeading !== null) {
-        let normalized = (rawHeading % 360 + 360) % 360;
+        // 180° Orientation Calibration Adjustment (Ensures physical North maps to 0° N)
+        let normalized = (rawHeading + 180) % 360;
         
         // Low-pass filter for smooth 360° compass heading
         if (Math.abs(normalized - this.smoothedHeading) > 180) {
