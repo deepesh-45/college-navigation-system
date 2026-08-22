@@ -8,6 +8,7 @@ export class SensorService {
   private stepCount: number = 0;
   private lastAccelMag: number = 0;
   private lastZAccel: number = 0;
+  private smoothedHeading: number = 0;
 
   // Request iOS 13+ motion & orientation permission if needed
   public async requestSensorsPermission(): Promise<boolean> {
@@ -23,20 +24,34 @@ export class SensorService {
     return true; // Non-iOS or permission already available
   }
 
-  // Watch Device Orientation Compass Heading
+  // Watch Device Orientation Compass Heading with Smooth Low-Pass Filtering
   public watchOrientation(onHeadingUpdate: (heading: number) => void): () => void {
     const handleOrientation = (event: DeviceOrientationEventiOS) => {
-      let compassHeading: number | null = null;
+      let rawHeading: number | null = null;
 
       if (typeof event.webkitCompassHeading === 'number') {
-        compassHeading = event.webkitCompassHeading;
+        rawHeading = event.webkitCompassHeading;
       } else if (event.alpha !== null) {
-        // Standard compass calculation from alpha/beta/gamma
-        compassHeading = 360 - event.alpha;
+        rawHeading = 360 - event.alpha;
       }
 
-      if (compassHeading !== null) {
-        onHeadingUpdate(Math.round(compassHeading % 360));
+      if (rawHeading !== null) {
+        let normalized = (rawHeading % 360 + 360) % 360;
+        
+        // Low-pass filter for smooth 360° compass heading
+        if (Math.abs(normalized - this.smoothedHeading) > 180) {
+          if (normalized > this.smoothedHeading) {
+            this.smoothedHeading += 360;
+          } else {
+            this.smoothedHeading -= 360;
+          }
+        }
+
+        const alpha = 0.25; // smoothing factor
+        this.smoothedHeading = this.smoothedHeading + alpha * (normalized - this.smoothedHeading);
+        const finalHeading = Math.round((this.smoothedHeading % 360 + 360) % 360);
+
+        onHeadingUpdate(finalHeading);
       }
     };
 
