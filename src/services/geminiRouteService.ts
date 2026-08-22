@@ -1,9 +1,12 @@
 import { GoogleGenAI } from '@google/genai';
 import { LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
 
-export const getGeminiApiKey = (): string => {
+export const getGeminiApiKeys = (): { primary: string; fallback: string } => {
   const metaEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
-  return metaEnv?.VITE_GEMINI_API_KEY || '';
+  return {
+    primary: metaEnv?.VITE_GEMINI_API_KEY || '',
+    fallback: metaEnv?.VITE_GEMINI_API_KEY_FALLBACK || ''
+  };
 };
 
 export const generateLLMRouteWithGemini = async (
@@ -11,7 +14,8 @@ export const generateLLMRouteWithGemini = async (
   compassHeading: number,
   stepsWalked: number
 ): Promise<LLMRouteKnowledge | null> => {
-  const apiKey = getGeminiApiKey();
+  const { primary, fallback } = getGeminiApiKeys();
+  const apiKeysToTry = [primary, fallback].filter(k => k && !k.includes('DemoApiKey'));
 
   const systemPrompt = `You are a Smart Campus Navigation AI.
 Convert the user's natural language voice description into a JSON LLMRouteKnowledge object.
@@ -49,8 +53,9 @@ JSON Format required:
 
   const userPrompt = `Raw voice input: "${rawDescription}". Current compass heading: ${compassHeading}° N. Current recorded steps: ${stepsWalked}.`;
 
-  try {
-    if (apiKey) {
+  // Try Primary Key then Fallback Key
+  for (const apiKey of apiKeysToTry) {
+    try {
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -62,12 +67,12 @@ JSON Format required:
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]) as LLMRouteKnowledge;
       }
+    } catch (err) {
+      console.warn('Gemini API Key attempt notice, trying fallback:', err);
     }
-  } catch (err) {
-    console.warn('Gemini API notice, using structured fallback parser:', err);
   }
 
-  // Pure Local LLM Parser Fallback (No Key Required)
+  // Pure Local LLM Structured Fallback Parser
   const isWashroom = rawDescription.toLowerCase().includes('washroom') || rawDescription.toLowerCase().includes('toilet');
   const isLab = rawDescription.toLowerCase().includes('lab') || rawDescription.toLowerCase().includes('ai');
   const category = isWashroom ? 'washroom' : isLab ? 'lab' : 'facility';

@@ -35,6 +35,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   
   // Active LLM Route
   const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge>(LLM_ROUTES_KNOWLEDGE[0]);
+  const [fallbackAlert, setFallbackAlert] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'navigate' | 'directory'>('navigate');
   const [showAdminPortal, setShowAdminPortal] = useState<boolean>(false);
 
@@ -98,8 +99,14 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
         setSelectedDestinationId(result.route.id);
         setSelectedStartPoint(result.route.startPoint);
         setHeadlineText(`Route for ${result.route.destinationName}`);
-        setSubtext(result.responseMessage);
 
+        if (result.isNearbyLandmarkFallback) {
+          setFallbackAlert(`⚠️ Direct route for "${query}" not found in database. Step 10 meters to nearby landmark "${result.nearbyLandmarkName}" to start route!`);
+        } else {
+          setFallbackAlert(null);
+        }
+
+        setSubtext(result.responseMessage);
         speechService.speak(result.responseMessage);
       } else {
         setVoiceState('error');
@@ -227,6 +234,13 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
 
         {activeTab === 'navigate' ? (
           <div className="space-y-4">
+            {fallbackAlert && (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold shadow-md flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
+                <span>{fallbackAlert}</span>
+              </div>
+            )}
+
             {/* Voice Hero Section (Smaller font size for balanced mobile UX) */}
             <div className="p-4 rounded-3xl bg-white/80 backdrop-blur-md border border-slate-200 shadow-md text-center">
               <AnimatedHeadline text={headlineText} subtext={subtext} voiceState={voiceState} />

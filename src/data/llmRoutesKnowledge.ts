@@ -23,6 +23,7 @@ export interface LLMRouteKnowledge {
 }
 
 export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
+  // DEMO EXAMPLE 1: Ground Floor Restroom via Multi-Turn East Corridor
   {
     id: "ROUTE_WASHROOM_GROUND",
     category: "washroom",
@@ -31,39 +32,50 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
     startPoint: "CSE Block Main Entrance Lobby",
     building: "Computer Science & AI Block",
     floor: 0,
-    totalSteps: 45,
-    totalDistanceMeters: 35,
-    overviewSummary: "Head North 30 steps down the main lobby, turn East at the notice board, and walk 15 steps.",
+    totalSteps: 48,
+    totalDistanceMeters: 36,
+    overviewSummary: "Face North 25 steps, turn East at Notice Board 15 steps, then turn South 8 steps.",
     steps: [
       {
         stepNumber: 1,
-        instruction: "Face North (360° N) at the Main Lobby Entrance and walk 30 steps straight down the main central corridor.",
+        instruction: "Facing North (360° N) at the Main Entrance Lobby, walk 25 steps straight down the central corridor.",
         headingDegrees: 0,
         headingText: "North (360°)",
-        stepsCount: 30,
-        landmarkHint: "Pass the orientation kiosk on your right",
-        voicePrompt: "Facing North, walk 30 steps straight down the main corridor."
+        stepsCount: 25,
+        landmarkHint: "Pass the orientation kiosk display on your right",
+        voicePrompt: "Facing North, walk 25 steps straight down the main corridor."
       },
       {
         stepNumber: 2,
-        instruction: "At the digital notice board junction, turn Right towards East (90° E).",
+        instruction: "At the Digital Notice Board junction, turn Right towards East (90° E).",
         headingDegrees: 90,
         headingText: "East (90°)",
         stepsCount: 0,
-        landmarkHint: "Notice board on corner wall",
+        landmarkHint: "Notice Board corner wall",
         voicePrompt: "Turn Right towards the East."
       },
       {
         stepNumber: 3,
-        instruction: "Walk 15 steps down the side hallway. The Washroom entrance is on your Left.",
+        instruction: "Walk 15 steps down the side corridor past the water dispenser.",
         headingDegrees: 90,
         headingText: "East (90°)",
         stepsCount: 15,
-        landmarkHint: "Restroom signage indicator",
-        voicePrompt: "Walk 15 steps. The washroom is on your left."
+        landmarkHint: "Water cooler & fire extinguisher pillar",
+        voicePrompt: "Walk 15 steps down the corridor."
+      },
+      {
+        stepNumber: 4,
+        instruction: "At the fire extinguisher pillar, turn Right towards South (180° S). Walk 8 steps.",
+        headingDegrees: 180,
+        headingText: "South (180°)",
+        stepsCount: 8,
+        landmarkHint: "Restroom signage overhead",
+        voicePrompt: "Turn Right South and walk 8 steps. The Washroom is on your right!"
       }
     ]
   },
+
+  // DEMO EXAMPLE 2: Advanced AI Lab (CS-204) via Staircase A Altitude Change
   {
     id: "ROUTE_AI_LAB_CS204",
     category: "lab",
@@ -72,48 +84,50 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
     startPoint: "CSE Block Main Entrance Lobby",
     building: "Computer Science & AI Block",
     floor: 1,
-    totalSteps: 70,
-    totalDistanceMeters: 55,
-    overviewSummary: "Walk 25 steps North to Staircase A, ascend to Floor 1, turn South, and walk 25 steps to Room CS-204.",
+    totalSteps: 82,
+    totalDistanceMeters: 62,
+    overviewSummary: "Walk North 30 steps to Staircase A, climb to Floor 1, turn West 20 steps, then turn South 12 steps.",
     steps: [
       {
         stepNumber: 1,
-        instruction: "Facing North (360° N), walk 25 steps straight down the hallway towards Staircase A.",
+        instruction: "Facing North (360° N) at the Lobby, walk 30 steps past the Dean's trophy wall to Staircase A landing.",
         headingDegrees: 0,
         headingText: "North (360°)",
-        stepsCount: 25,
-        landmarkHint: "Staircase A glass door ahead",
-        voicePrompt: "Walk 25 steps North to Staircase A."
+        stepsCount: 30,
+        landmarkHint: "Trophy display wall on left",
+        voicePrompt: "Walk 30 steps North to Staircase A."
       },
       {
         stepNumber: 2,
-        instruction: "Walk up Staircase A (20 steps) to reach Floor 1 corridor.",
+        instruction: "Climb up Staircase A (20 steps) to Floor 1 landing. (Altitude sensor will detect floor change!).",
         headingDegrees: 0,
         headingText: "North (360°)",
         stepsCount: 20,
-        landmarkHint: "Floor 1 signage landing",
-        voicePrompt: "Take the stairs up to Floor 1."
+        landmarkHint: "Floor 1 glass double doors landing",
+        voicePrompt: "Climb the stairs to Floor 1."
       },
       {
         stepNumber: 3,
-        instruction: "On Floor 1 landing, turn 180° South (180° S) into the East wing corridor.",
-        headingDegrees: 180,
-        headingText: "South (180°)",
-        stepsCount: 0,
-        landmarkHint: "Department awards display case",
-        voicePrompt: "Turn South into the East wing corridor."
+        instruction: "On Floor 1 landing, turn Left towards West (270° W) into the Executive Department Wing.",
+        headingDegrees: 270,
+        headingText: "West (270°)",
+        stepsCount: 20,
+        landmarkHint: "Executive Department corridor",
+        voicePrompt: "Turn Left West and walk 20 steps."
       },
       {
         stepNumber: 4,
-        instruction: "Walk 25 steps. Advanced AI Lab (CS-204) is the second glass door on your Right.",
+        instruction: "At the HOD notice display, turn Left towards South (180° S). Walk 12 steps.",
         headingDegrees: 180,
         headingText: "South (180°)",
-        stepsCount: 25,
+        stepsCount: 12,
         landmarkHint: "Smart Door Lock #CS-204",
-        voicePrompt: "Walk 25 steps. AI Lab CS-204 is on your right."
+        voicePrompt: "Turn South and walk 12 steps. Advanced AI Lab CS-204 is on your left!"
       }
     ]
   },
+
+  // DEMO EXAMPLE 3: HOD CSE Office Suite (Dr. Rajesh Kumar)
   {
     id: "ROUTE_HOD_CABIN",
     category: "cabin",
@@ -124,20 +138,20 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
     floor: 1,
     totalSteps: 85,
     totalDistanceMeters: 65,
-    overviewSummary: "Walk 25 steps North to Elevator/Stairs, go to Floor 1, turn West, and walk 40 steps to HOD Cabin.",
+    overviewSummary: "Walk North 25 steps to Elevator B, take elevator to Floor 1, turn West 40 steps.",
     steps: [
       {
         stepNumber: 1,
-        instruction: "Walk 25 steps North to the Elevator Elevator Bank / Staircase A.",
+        instruction: "Walk 25 steps North to Elevator Elevator Bank B / Staircase A.",
         headingDegrees: 0,
         headingText: "North (360°)",
         stepsCount: 25,
-        landmarkHint: "Elevator indicator LED",
+        landmarkHint: "Elevator indicator LED panel",
         voicePrompt: "Walk 25 steps North to the elevator."
       },
       {
         stepNumber: 2,
-        instruction: "Take Elevator or Stairs to Floor 1.",
+        instruction: "Take Elevator B or Stairs up to Floor 1.",
         headingDegrees: 0,
         headingText: "North (360°)",
         stepsCount: 20,
@@ -164,6 +178,8 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
       }
     ]
   },
+
+  // DEMO EXAMPLE 4: Central Knowledge Library & Digital Hub
   {
     id: "ROUTE_LIBRARY",
     category: "facility",
@@ -174,7 +190,7 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
     floor: 0,
     totalSteps: 120,
     totalDistanceMeters: 90,
-    overviewSummary: "Head East 80 steps along the main paved walkway, turn North 40 steps to Library Plaza entrance.",
+    overviewSummary: "Head East 80 steps along the palm tree walkway, turn North 40 steps up the ramp.",
     steps: [
       {
         stepNumber: 1,
@@ -205,6 +221,8 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
       }
     ]
   },
+
+  // DEMO EXAMPLE 5: Student Food Court & Canteen
   {
     id: "ROUTE_CANTEEN",
     category: "canteen",

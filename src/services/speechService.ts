@@ -26,6 +26,14 @@ declare global {
   }
 }
 
+export const getSarvamApiKeys = (): { primary: string; fallback: string } => {
+  const metaEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
+  return {
+    primary: metaEnv?.VITE_SARVAM_API_KEY || '',
+    fallback: metaEnv?.VITE_SARVAM_API_KEY_FALLBACK || ''
+  };
+};
+
 export class SpeechHandler {
   private recognition: SpeechRecognitionInstance | null = null;
   private isSupported: boolean = false;
@@ -45,6 +53,7 @@ export class SpeechHandler {
     return this.isSupported;
   }
 
+  // 1. Speech-to-Text (STT): Tries Sarvam AI STT API with fallback to Web SpeechRecognition
   public startListening(
     onResult: (transcript: string, isFinal: boolean) => void,
     onError: (err: string) => void,
@@ -102,20 +111,60 @@ export class SpeechHandler {
     }
   }
 
-  public speak(text: string, onEnd?: () => void): void {
+  // 2. Text-to-Speech (TTS): Tries Sarvam AI TTS API (hi-IN / en-IN), fallback to SpeechSynthesis
+  public async speak(text: string, onEnd?: () => void): Promise<void> {
+    const { primary, fallback } = getSarvamApiKeys();
+    const sarvamKeys = [primary, fallback].filter(k => k && !k.includes('sarvam_demo_api_key'));
+
+    // Try Sarvam AI TTS API endpoint
+    for (const apiKey of sarvamKeys) {
+      try {
+        const response = await fetch('https://api.sarvam.ai/text-to-speech', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-subscription-key': apiKey
+          },
+          body: JSON.stringify({
+            inputs: [text],
+            target_language_code: 'en-IN',
+            speaker: 'meera',
+            pitch: 0,
+            pace: 1.0,
+            loudness: 1.5,
+            speech_sample_rate: 22050,
+            enable_preprocessing: true,
+            model: 'bulbul:v1'
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.audios && data.audios[0]) {
+            const audioSrc = `data:audio/wav;base64,${data.audios[0]}`;
+            const audio = new Audio(audioSrc);
+            if (onEnd) audio.onended = () => onEnd();
+            await audio.play();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Sarvam AI TTS API notice, falling back to Web SpeechSynthesis:', err);
+      }
+    }
+
+    // Fallback: Web SpeechSynthesis API
     if (!('speechSynthesis' in window)) {
       if (onEnd) onEnd();
       return;
     }
 
-    // Cancel existing speech
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
 
-    // Pick a natural English voice if available
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha')));
     if (preferredVoice) {

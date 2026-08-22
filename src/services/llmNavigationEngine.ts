@@ -2,6 +2,8 @@ import { LLM_ROUTES_KNOWLEDGE, LLMRouteKnowledge } from '../data/llmRoutesKnowle
 
 export interface LLMNavigationResult {
   matched: boolean;
+  isNearbyLandmarkFallback?: boolean;
+  nearbyLandmarkName?: string;
   route: LLMRouteKnowledge | null;
   responseMessage: string;
 }
@@ -23,6 +25,7 @@ export const resolveLLMVoiceQuery = (query: string): LLMNavigationResult => {
       if (normalized.includes(alias)) {
         return {
           matched: true,
+          isNearbyLandmarkFallback: false,
           route,
           responseMessage: `Found route to ${route.destinationName}! ${route.overviewSummary}`
         };
@@ -30,11 +33,12 @@ export const resolveLLMVoiceQuery = (query: string): LLMNavigationResult => {
     }
   }
 
-  // 2. Fuzzy match on category or keywords
+  // 2. Category Keyword Matching
   if (normalized.includes('washroom') || normalized.includes('toilet') || normalized.includes('restroom')) {
     const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'washroom') || LLM_ROUTES_KNOWLEDGE[0];
     return {
       matched: true,
+      isNearbyLandmarkFallback: false,
       route,
       responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
     };
@@ -44,6 +48,7 @@ export const resolveLLMVoiceQuery = (query: string): LLMNavigationResult => {
     const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'lab') || LLM_ROUTES_KNOWLEDGE[1];
     return {
       matched: true,
+      isNearbyLandmarkFallback: false,
       route,
       responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
     };
@@ -53,6 +58,7 @@ export const resolveLLMVoiceQuery = (query: string): LLMNavigationResult => {
     const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'cabin') || LLM_ROUTES_KNOWLEDGE[2];
     return {
       matched: true,
+      isNearbyLandmarkFallback: false,
       route,
       responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
     };
@@ -62,6 +68,7 @@ export const resolveLLMVoiceQuery = (query: string): LLMNavigationResult => {
     const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'facility') || LLM_ROUTES_KNOWLEDGE[3];
     return {
       matched: true,
+      isNearbyLandmarkFallback: false,
       route,
       responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
     };
@@ -71,16 +78,21 @@ export const resolveLLMVoiceQuery = (query: string): LLMNavigationResult => {
     const route = LLM_ROUTES_KNOWLEDGE.find(r => r.category === 'canteen') || LLM_ROUTES_KNOWLEDGE[4];
     return {
       matched: true,
+      isNearbyLandmarkFallback: false,
       route,
       responseMessage: `Found route to ${route.destinationName}. ${route.overviewSummary}`
     };
   }
 
-  // Fallback to closest match
+  // 3. Fallback: Direct route not found -> Guide user to Nearby Landmark Point!
   const fallbackRoute = LLM_ROUTES_KNOWLEDGE[0];
+  const nearbyLandmark = fallbackRoute.startPoint; // e.g. "CSE Block Main Entrance Lobby"
+
   return {
     matched: true,
+    isNearbyLandmarkFallback: true,
+    nearbyLandmarkName: nearbyLandmark,
     route: fallbackRoute,
-    responseMessage: `Navigating to ${fallbackRoute.destinationName}. ${fallbackRoute.overviewSummary}`
+    responseMessage: `⚠️ Direct route for "${query}" not found in database. Please walk 10 meters to nearby landmark "${nearbyLandmark}", from where your guided route starts!`
   };
 };
