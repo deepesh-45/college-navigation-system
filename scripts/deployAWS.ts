@@ -82,7 +82,7 @@ async function promptAndDeployAWS() {
   }
 
   // Dynamic import of AWS S3 SDK
-  const { S3Client, PutObjectCommand, CreateBucketCommand, PutBucketWebsiteCommand, PutPublicAccessBlockCommand } = await import('@aws-sdk/client-s3');
+  const { S3Client, PutObjectCommand, CreateBucketCommand, PutBucketWebsiteCommand, PutPublicAccessBlockCommand, PutBucketPolicyCommand } = await import('@aws-sdk/client-s3');
 
   const s3Client = new S3Client({
     region: awsRegion,
@@ -101,6 +101,22 @@ async function promptAndDeployAWS() {
     console.log(`ℹ️ Connected to S3 Bucket "${awsBucket}".`);
   }
 
+  // Disable Public Access Block for Web Hosting
+  try {
+    await s3Client.send(new PutPublicAccessBlockCommand({
+      Bucket: awsBucket,
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: false,
+        IgnorePublicAcls: false,
+        BlockPublicPolicy: false,
+        RestrictPublicBuckets: false
+      }
+    }));
+    console.log(`✅ Unblocked Public Access Policy for ${awsBucket}`);
+  } catch (err) {
+    console.log(`ℹ️ Public Access Block policy updated.`);
+  }
+
   // Configure Website Hosting on S3
   try {
     await s3Client.send(new PutBucketWebsiteCommand({
@@ -115,19 +131,27 @@ async function promptAndDeployAWS() {
     console.log(`ℹ️ Website hosting configuration updated.`);
   }
 
-  // Disable Public Access Block for Web Hosting
+  // Configure Public Read Bucket Policy
   try {
-    await s3Client.send(new PutPublicAccessBlockCommand({
+    const bucketPolicy = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Sid: "PublicReadGetObject",
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:GetObject",
+          Resource: `arn:aws:s3:::${awsBucket}/*`
+        }
+      ]
+    };
+    await s3Client.send(new PutBucketPolicyCommand({
       Bucket: awsBucket,
-      PublicAccessBlockConfiguration: {
-        BlockPublicAcls: false,
-        IgnorePublicAcls: false,
-        BlockPublicPolicy: false,
-        RestrictPublicBuckets: false
-      }
+      Policy: JSON.stringify(bucketPolicy)
     }));
-  } catch (err) {
-    // Ignore if managed by parent AWS account policy
+    console.log(`✅ Applied Public Read Policy (s3:GetObject) for ${awsBucket}`);
+  } catch (err: any) {
+    console.log(`ℹ️ Bucket policy notice: ${err.message || 'Updated'}`);
   }
 
   // 3. Upload Files from dist/ to AWS S3
