@@ -16,16 +16,42 @@ interface MobileNavigationViewProps {
   onBackToGreeting: () => void;
 }
 
+const EMPTY_STARTER_ROUTE: LLMRouteKnowledge = {
+  id: "STARTER_EMPTY_ROUTE",
+  category: "facility",
+  destinationName: "No Routes Yet — Use Admin Panel to Add Campus Data",
+  aliases: ["admin", "add route"],
+  startPoint: "CSE Block Main Entrance Lobby",
+  building: "Main Campus Building",
+  floor: 0,
+  totalSteps: 0,
+  totalDistanceMeters: 0,
+  overviewSummary: "Click Admin (password: admin123) to record live compass & accelerometer step data for campus routes!",
+  steps: [
+    {
+      stepNumber: 1,
+      instruction: "Dataset is ready for campus data collection! Open the Admin Panel (top right button) to record real campus routes.",
+      headingDegrees: 0,
+      headingText: "North (360°)",
+      stepsCount: 0,
+      landmarkHint: "Admin Panel top right button",
+      voicePrompt: "Dataset is ready for campus data collection. Open the Admin panel to add routes."
+    }
+  ]
+};
+
 export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   onBackToGreeting
 }) => {
+  const initialRoute = LLM_ROUTES_KNOWLEDGE.length > 0 ? LLM_ROUTES_KNOWLEDGE[0] : EMPTY_STARTER_ROUTE;
+
   // Dual Input Boxes State
-  const [selectedStartPoint, setSelectedStartPoint] = useState<string>('CSE Block Main Entrance Lobby');
-  const [selectedDestinationId, setSelectedDestinationId] = useState<string>(LLM_ROUTES_KNOWLEDGE[0].id);
+  const [selectedStartPoint, setSelectedStartPoint] = useState<string>(initialRoute.startPoint);
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string>(initialRoute.id);
 
   // Active Navigation State
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
-  const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge>(LLM_ROUTES_KNOWLEDGE[0]);
+  const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge>(initialRoute);
 
   // Voice & Ambiguity State
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
@@ -37,10 +63,17 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   const [showAdminPortal, setShowAdminPortal] = useState<boolean>(false);
 
   // Available unique start points
-  const startPoints = Array.from(new Set(LLM_ROUTES_KNOWLEDGE.map(r => r.startPoint)));
+  const startPoints = LLM_ROUTES_KNOWLEDGE.length > 0 
+    ? Array.from(new Set(LLM_ROUTES_KNOWLEDGE.map(r => r.startPoint))) 
+    : [EMPTY_STARTER_ROUTE.startPoint];
 
   // Sync route selection when dropdown inputs change
   useEffect(() => {
+    if (LLM_ROUTES_KNOWLEDGE.length === 0) {
+      setActiveLLMRoute(EMPTY_STARTER_ROUTE);
+      return;
+    }
+
     const matchedRoute = LLM_ROUTES_KNOWLEDGE.find(
       r => r.id === selectedDestinationId && r.startPoint === selectedStartPoint
     ) || LLM_ROUTES_KNOWLEDGE.find(r => r.id === selectedDestinationId) || LLM_ROUTES_KNOWLEDGE[0];
@@ -204,11 +237,17 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
               }}
               className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8] truncate"
             >
-              {LLM_ROUTES_KNOWLEDGE.map(r => (
-                <option key={r.id} value={r.id}>
-                  🎯 {r.destinationName}
+              {LLM_ROUTES_KNOWLEDGE.length > 0 ? (
+                LLM_ROUTES_KNOWLEDGE.map(r => (
+                  <option key={r.id} value={r.id}>
+                    🎯 {r.destinationName}
+                  </option>
+                ))
+              ) : (
+                <option value={EMPTY_STARTER_ROUTE.id}>
+                  🎯 Add Routes via Admin Panel
                 </option>
-              ))}
+              )}
             </select>
           </div>
         </div>
@@ -276,7 +315,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
         </div>
       )}
 
-      {/* 2. REAL-TIME 360° COMPASS & ACCELEROMETER STEP COUNTER (FITS 100% SINGLE SCREEN) */}
+      {/* 2. REAL-TIME 360° COMPASS & ACCELEROMETER STEP COUNTER */}
       <div className="z-10 flex-1 flex flex-col min-h-0">
         <LLMVoiceCockpit
           route={activeLLMRoute}
@@ -302,7 +341,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
 
       {/* Compact Single-Screen Footer */}
       <footer className="p-1.5 bg-white/80 backdrop-blur-md rounded-xl border border-slate-200 text-center text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-wider z-10">
-        Smart Campus AI Navigation • Single Screen Mobile Fit
+        Smart Campus AI Navigation • Ready for Real Data Entry
       </footer>
     </div>
   );

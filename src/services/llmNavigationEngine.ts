@@ -23,11 +23,20 @@ export const resolveLLMVoiceQuery = (query: string, customStartName?: string): L
     };
   }
 
+  // Handle completely empty dataset case
+  if (LLM_ROUTES_KNOWLEDGE.length === 0 && CAMPUS_NODES.length === 0) {
+    return {
+      matched: false,
+      route: null,
+      responseMessage: "Dataset is currently empty for real campus data entry. Please use the Admin Panel (top right button, password: admin123) to record real campus routes!"
+    };
+  }
+
   // 1. Try Graph Shortest Path Permutation Engine
-  const startNode = findNodeByIdOrAlias(customStartName || 'main entrance') || CAMPUS_NODES[0];
+  const startNode = CAMPUS_NODES.length > 0 ? (findNodeByIdOrAlias(customStartName || 'main entrance') || CAMPUS_NODES[0]) : null;
   const destNode = findNodeByIdOrAlias(query);
 
-  if (destNode && startNode.id !== destNode.id) {
+  if (startNode && destNode && startNode.id !== destNode.id) {
     const graphRoute = generateRoutePermutationFromGraph(startNode, destNode);
     if (graphRoute) {
       return {
@@ -79,16 +88,16 @@ export const resolveLLMVoiceQuery = (query: string, customStartName?: string): L
     };
   }
 
-  // 5. Fallback: Direct route not found -> Guide user to Nearby Landmark Point!
-  const fallbackRoute = LLM_ROUTES_KNOWLEDGE[0];
-  const nearbyLandmark = fallbackRoute.startPoint; // e.g. "CSE Block Main Entrance Lobby"
+  // 5. Fallback: Direct route not found
+  const fallbackRoute = LLM_ROUTES_KNOWLEDGE.length > 0 ? LLM_ROUTES_KNOWLEDGE[0] : null;
+  const nearbyLandmark = fallbackRoute ? fallbackRoute.startPoint : "Campus Main Entrance";
 
   return {
-    matched: true,
+    matched: fallbackRoute !== null,
     isAmbiguous: false,
     isNearbyLandmarkFallback: true,
     nearbyLandmarkName: nearbyLandmark,
     route: fallbackRoute,
-    responseMessage: `⚠️ Direct route for "${query}" not found in database. Please walk 10 meters to nearby landmark "${nearbyLandmark}", from where your guided route starts!`
+    responseMessage: `⚠️ Direct route for "${query}" not found in dataset. Please use the Admin Panel to record this location!`
   };
 };
