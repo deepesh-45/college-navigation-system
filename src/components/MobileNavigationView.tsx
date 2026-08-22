@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatedHeadline } from './AnimatedHeadline';
 import { VoiceVisualizer } from './VoiceVisualizer';
 import { LLMVoiceCockpit } from './LLMVoiceCockpit';
@@ -10,7 +10,7 @@ import { resolveLLMVoiceQuery } from '../services/llmNavigationEngine';
 import { LLMRouteKnowledge, LLM_ROUTES_KNOWLEDGE } from '../data/llmRoutesKnowledge';
 import { VoiceState } from '../types';
 
-import { Sparkles, Search, Home, Compass, MapPin, ArrowLeft, Key } from 'lucide-react';
+import { Sparkles, Home, Compass, MapPin, ArrowLeft, Key, Navigation } from 'lucide-react';
 
 interface MobileNavigationViewProps {
   userRole: string;
@@ -21,17 +21,36 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   userRole,
   onBackToGreeting
 }) => {
+  // Dual Input Boxes State
+  const [selectedStartPoint, setSelectedStartPoint] = useState<string>('CSE Block Main Entrance Lobby');
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string>(LLM_ROUTES_KNOWLEDGE[0].id);
+
+  // Dynamic Headline Text & Subtext
+  const [headlineText, setHeadlineText] = useState<string>('Where would you like to go?');
+  const [subtext, setSubtext] = useState<string>('Select start & destination above or tap mic to speak.');
+
   // Voice State
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState<string>('');
-  const [headlineText, setHeadlineText] = useState<string>('Where would you like to go?');
-  const [subtext, setSubtext] = useState<string>('Speak your destination naturally or tap one of the popular spots below.');
-
-  // Active LLM Route Knowledge
-  const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge | null>(LLM_ROUTES_KNOWLEDGE[0]);
-  const [textSearchInput, setTextSearchInput] = useState<string>('');
+  
+  // Active LLM Route
+  const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge>(LLM_ROUTES_KNOWLEDGE[0]);
   const [activeTab, setActiveTab] = useState<'navigate' | 'directory'>('navigate');
   const [showAdminPortal, setShowAdminPortal] = useState<boolean>(false);
+
+  // Available unique start points and destinations
+  const startPoints = Array.from(new Set(LLM_ROUTES_KNOWLEDGE.map(r => r.startPoint)));
+
+  // Update Route when Dual Inputs change
+  useEffect(() => {
+    const matchedRoute = LLM_ROUTES_KNOWLEDGE.find(
+      r => r.id === selectedDestinationId && r.startPoint === selectedStartPoint
+    ) || LLM_ROUTES_KNOWLEDGE.find(r => r.id === selectedDestinationId) || LLM_ROUTES_KNOWLEDGE[0];
+
+    setActiveLLMRoute(matchedRoute);
+    setHeadlineText(`Route for ${matchedRoute.destinationName}`);
+    setSubtext(`From ${matchedRoute.startPoint} • Total ${matchedRoute.totalSteps} steps (${matchedRoute.totalDistanceMeters}m walk)`);
+  }, [selectedStartPoint, selectedDestinationId]);
 
   // Handle Voice Input Trigger
   const handleMicClick = () => {
@@ -44,7 +63,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     setVoiceState('listening');
     setTranscript('');
     setHeadlineText('Listening...');
-    setSubtext('Please speak clearly into your phone mic (e.g., "Where is the washroom?")');
+    setSubtext('Speak clearly into your phone mic (e.g., "Where is the washroom?")');
 
     speechService.startListening(
       (finalText, isFinal) => {
@@ -56,7 +75,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
       (_err) => {
         setVoiceState('error');
         setHeadlineText('Could not understand voice input');
-        setSubtext('Please try again or use text search.');
+        setSubtext('Please try again or select from the dropdowns above.');
       },
       () => {
         setVoiceState(prev => (prev === 'listening' ? 'idle' : prev));
@@ -64,11 +83,11 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     );
   };
 
-  // Process Query via LLM Navigation Engine
+  // Process Voice Query via LLM Engine
   const handleProcessVoiceQuery = (query: string) => {
     setVoiceState('processing');
-    setHeadlineText('Parsing LLM Navigation Knowledge...');
-    setSubtext(`Processing natural language intent for "${query}"`);
+    setHeadlineText('Parsing Voice Query...');
+    setSubtext(`Searching navigation dataset for "${query}"`);
 
     setTimeout(() => {
       const result = resolveLLMVoiceQuery(query);
@@ -76,7 +95,9 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
       if (result.matched && result.route) {
         setVoiceState('success');
         setActiveLLMRoute(result.route);
-        setHeadlineText(result.route.destinationName);
+        setSelectedDestinationId(result.route.id);
+        setSelectedStartPoint(result.route.startPoint);
+        setHeadlineText(`Route for ${result.route.destinationName}`);
         setSubtext(result.responseMessage);
 
         speechService.speak(result.responseMessage);
@@ -138,29 +159,49 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
       {/* Main Responsive Mobile Content Container */}
       <main className="flex-1 p-4 space-y-4 overflow-y-auto z-10">
         
-        {/* Search Bar Input */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (textSearchInput) handleProcessVoiceQuery(textSearchInput);
-          }}
-          className="relative"
-        >
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={textSearchInput}
-            onChange={(e) => setTextSearchInput(e.target.value)}
-            placeholder="Search washroom, lab, hod office..."
-            className="w-full pl-9 pr-20 py-3 rounded-2xl bg-white border border-slate-200 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#1d4ed8] shadow-md transition-all"
-          />
-          <button
-            type="submit"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-xl bg-[#1d4ed8] text-white font-bold text-xs shadow-sm"
-          >
-            Find
-          </button>
-        </form>
+        {/* DUAL INPUT BOXES (Start Location & Destination) FOR NON-VOICE USERS */}
+        <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-md space-y-3">
+          <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[#1d4ed8]">
+            <Navigation className="w-4 h-4" />
+            <span>Select Route Manual Inputs:</span>
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <label className="text-[10px] font-extrabold uppercase text-slate-500 block mb-1">
+                Current Location (Start Point):
+              </label>
+              <select
+                value={selectedStartPoint}
+                onChange={(e) => setSelectedStartPoint(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#1d4ed8]"
+              >
+                {startPoints.map((sp, idx) => (
+                  <option key={idx} value={sp}>
+                    📍 {sp}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-extrabold uppercase text-slate-500 block mb-1">
+                Destination:
+              </label>
+              <select
+                value={selectedDestinationId}
+                onChange={(e) => setSelectedDestinationId(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#1d4ed8]"
+              >
+                {LLM_ROUTES_KNOWLEDGE.map(r => (
+                  <option key={r.id} value={r.id}>
+                    🎯 {r.destinationName} ({r.category})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
 
         {/* Navigation vs Directory Tab Switcher */}
         <div className="flex bg-slate-200/70 p-1 rounded-2xl gap-1">
@@ -186,7 +227,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
 
         {activeTab === 'navigate' ? (
           <div className="space-y-4">
-            {/* Voice Hero Section */}
+            {/* Voice Hero Section (Smaller font size for balanced mobile UX) */}
             <div className="p-4 rounded-3xl bg-white/80 backdrop-blur-md border border-slate-200 shadow-md text-center">
               <AnimatedHeadline text={headlineText} subtext={subtext} voiceState={voiceState} />
               
@@ -219,7 +260,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
               </div>
             </div>
 
-            {/* Active LLM Route Compass & Step Cockpit */}
+            {/* Active LLM Route Compass & Single Step Display Cockpit */}
             {activeLLMRoute && (
               <LLMVoiceCockpit
                 route={activeLLMRoute}
@@ -238,8 +279,10 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
                 key={item.id}
                 onClick={() => {
                   setActiveLLMRoute(item);
+                  setSelectedDestinationId(item.id);
+                  setSelectedStartPoint(item.startPoint);
                   setActiveTab('navigate');
-                  setHeadlineText(item.destinationName);
+                  setHeadlineText(`Route for ${item.destinationName}`);
                   setSubtext(item.overviewSummary);
                   speechService.speak(`Selected route for ${item.destinationName}. ${item.overviewSummary}`);
                 }}
@@ -268,6 +311,8 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
           onClose={() => setShowAdminPortal(false)}
           onRouteAdded={(newRoute) => {
             setActiveLLMRoute(newRoute);
+            setSelectedDestinationId(newRoute.id);
+            setSelectedStartPoint(newRoute.startPoint);
             setActiveTab('navigate');
           }}
         />

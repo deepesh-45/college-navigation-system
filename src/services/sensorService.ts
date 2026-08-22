@@ -7,6 +7,7 @@ interface DeviceOrientationEventiOS extends DeviceOrientationEvent {
 export class SensorService {
   private stepCount: number = 0;
   private lastAccelMag: number = 0;
+  private lastZAccel: number = 0;
 
   // Request iOS 13+ motion & orientation permission if needed
   public async requestSensorsPermission(): Promise<boolean> {
@@ -65,6 +66,40 @@ export class SensorService {
       }
 
       this.lastAccelMag = magnitude;
+    };
+
+    window.addEventListener('devicemotion', handleMotion, true);
+
+    return () => {
+      window.removeEventListener('devicemotion', handleMotion, true);
+    };
+  }
+
+  // Reset Accelerometer Step Counter to 0 for new turn step segment
+  public resetStepCounter(): void {
+    this.stepCount = 0;
+  }
+
+  // Watch Altitude / Vertical Acceleration for Floor Change Detection (Climbing Stairs/Elevator)
+  public watchAltitudeFloorChange(onFloorChange: (direction: 'up' | 'down') => void): () => void {
+    let verticalAccumulator = 0;
+
+    const handleMotion = (event: DeviceMotionEvent) => {
+      const acc = event.accelerationIncludingGravity;
+      if (!acc || acc.z === null) return;
+
+      const zDelta = acc.z - this.lastZAccel;
+      if (Math.abs(zDelta) > 3.5) {
+        verticalAccumulator += zDelta;
+        if (verticalAccumulator > 14) {
+          onFloorChange('up');
+          verticalAccumulator = 0;
+        } else if (verticalAccumulator < -14) {
+          onFloorChange('down');
+          verticalAccumulator = 0;
+        }
+      }
+      this.lastZAccel = acc.z;
     };
 
     window.addEventListener('devicemotion', handleMotion, true);
