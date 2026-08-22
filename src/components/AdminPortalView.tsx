@@ -97,8 +97,8 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
 
   if (!isAuthenticated) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 font-l3">
-        <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-200 shadow-2xl space-y-4">
+      <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 font-l3">
+        <div className="bg-white rounded-3xl p-4 sm:p-6 max-w-sm w-full border border-slate-200 shadow-2xl space-y-3.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-slate-900 font-bold font-l2">
               <div className="p-2 rounded-xl bg-blue-50 text-[#1d4ed8]">
@@ -137,8 +137,8 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 font-l3">
-      <div className="bg-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 font-l3">
+      <div className="bg-white rounded-3xl p-4 sm:p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-3.5 max-h-[85dvh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
