@@ -1,23 +1,74 @@
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 
-// Load environment variables from .env
 dotenv.config();
 
-async function deployToAWSWithSDK() {
-  console.log('🚀 Initiating Smart AI Campus Navigation AWS Direct API Deployment...\n');
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
 
-  const awsKey = process.env.AWS_ACCESS_KEY_ID;
-  const awsSecret = process.env.AWS_SECRET_ACCESS_KEY;
-  const awsRegion = process.env.AWS_DEFAULT_REGION || 'us-east-1';
-  const awsBucket = process.env.AWS_S3_BUCKET || 'college-navigation-system-live';
+const askQuestion = (query: string): Promise<string> => {
+  return new Promise((resolve) => rl.question(query, (ans) => resolve(ans.trim())));
+};
 
+async function promptAndDeployAWS() {
+  console.log('\n===================================================================');
+  console.log('🚀 SMART AI CAMPUS NAVIGATION - AWS DIRECT DEPLOYMENT');
+  console.log('===================================================================\n');
+
+  const envPath = path.join(process.cwd(), '.env');
+  let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf-8') : '';
+
+  let awsKey = process.env.AWS_ACCESS_KEY_ID;
+  let awsSecret = process.env.AWS_SECRET_ACCESS_KEY;
+  let awsRegion = process.env.AWS_DEFAULT_REGION || 'us-east-1';
+  let awsBucket = process.env.AWS_S3_BUCKET || 'college-navigation-system-live';
+
+  // Check if AWS Keys need terminal user input
   if (!awsKey || awsKey.includes('EXAMPLE') || !awsSecret || awsSecret.includes('EXAMPLE')) {
-    console.error('❌ AWS API Credentials Missing in .env file!');
-    console.error('👉 Please update your .env file with valid AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY credentials.\n');
-    process.exit(1);
+    console.log('🗝️ AWS Credentials not found in .env. Please enter your AWS keys below:\n');
+
+    if (!awsKey || awsKey.includes('EXAMPLE')) {
+      awsKey = await askQuestion('👉 Enter AWS Access Key ID (e.g. AKIA...): ');
+    }
+
+    if (!awsSecret || awsSecret.includes('EXAMPLE')) {
+      awsSecret = await askQuestion('👉 Enter AWS Secret Access Key: ');
+    }
+
+    const customRegion = await askQuestion(`👉 Enter AWS Region [default: ${awsRegion}]: `);
+    if (customRegion) awsRegion = customRegion;
+
+    const customBucket = await askQuestion(`👉 Enter AWS S3 Bucket Name [default: ${awsBucket}]: `);
+    if (customBucket) awsBucket = customBucket;
+
+    rl.close();
+
+    if (!awsKey || !awsSecret) {
+      console.error('\n❌ AWS Access Key ID and Secret Access Key are required!');
+      process.exit(1);
+    }
+
+    // Save entered credentials into .env automatically
+    console.log('\n💾 Saving AWS Credentials to .env file...');
+    envContent = envContent
+      .replace(/AWS_ACCESS_KEY_ID=.*/g, `AWS_ACCESS_KEY_ID=${awsKey}`)
+      .replace(/AWS_SECRET_ACCESS_KEY=.*/g, `AWS_SECRET_ACCESS_KEY=${awsSecret}`)
+      .replace(/AWS_DEFAULT_REGION=.*/g, `AWS_DEFAULT_REGION=${awsRegion}`)
+      .replace(/AWS_S3_BUCKET=.*/g, `AWS_S3_BUCKET=${awsBucket}`);
+
+    if (!envContent.includes('AWS_ACCESS_KEY_ID')) {
+      envContent += `\nAWS_ACCESS_KEY_ID=${awsKey}\nAWS_SECRET_ACCESS_KEY=${awsSecret}\nAWS_DEFAULT_REGION=${awsRegion}\nAWS_S3_BUCKET=${awsBucket}\n`;
+    }
+
+    fs.writeFileSync(envPath, envContent, 'utf-8');
+    console.log('✅ AWS Credentials saved to .env!\n');
+  } else {
+    rl.close();
   }
 
   // 1. Build Production Bundle
@@ -30,21 +81,8 @@ async function deployToAWSWithSDK() {
     process.exit(1);
   }
 
-  // Dynamic import of AWS SDK
-  let S3Client, PutObjectCommand, CreateBucketCommand;
-  try {
-    const s3Module = await import('@aws-sdk/client-s3');
-    S3Client = s3Module.S3Client;
-    PutObjectCommand = s3Module.PutObjectCommand;
-    CreateBucketCommand = s3Module.CreateBucketCommand;
-  } catch (err) {
-    console.log('📦 Installing AWS SDK dependencies...');
-    execSync('npm install @aws-sdk/client-s3 --save-dev', { stdio: 'inherit' });
-    const s3Module = await import('@aws-sdk/client-s3');
-    S3Client = s3Module.S3Client;
-    PutObjectCommand = s3Module.PutObjectCommand;
-    CreateBucketCommand = s3Module.CreateBucketCommand;
-  }
+  // Dynamic import of AWS S3 SDK
+  const { S3Client, PutObjectCommand, CreateBucketCommand } = await import('@aws-sdk/client-s3');
 
   const s3Client = new S3Client({
     region: awsRegion,
@@ -54,20 +92,16 @@ async function deployToAWSWithSDK() {
     }
   });
 
-  // 2. Ensure S3 Bucket Exists
-  console.log(`☁️ Step 2/3: Checking AWS S3 Bucket "${awsBucket}" in region "${awsRegion}"...`);
+  // 2. Provision / Check S3 Bucket
+  console.log(`☁️ Step 2/3: Connecting to AWS S3 Bucket "${awsBucket}" in region "${awsRegion}"...`);
   try {
     await s3Client.send(new CreateBucketCommand({ Bucket: awsBucket }));
     console.log(`✅ Provisioned S3 Bucket: ${awsBucket}`);
   } catch (err: any) {
-    if (err.name === 'BucketAlreadyOwnedByYou' || err.name === 'BucketAlreadyExists') {
-      console.log(`✅ Using existing S3 Bucket: ${awsBucket}`);
-    } else {
-      console.log(`ℹ️ Bucket check complete for "${awsBucket}".`);
-    }
+    console.log(`ℹ️ Connected to S3 Bucket "${awsBucket}".`);
   }
 
-  // 3. Upload Files from dist/ to S3
+  // 3. Upload Files from dist/ to AWS S3
   const distDir = path.join(process.cwd(), 'dist');
   const getFiles = (dir: string): string[] => {
     const subdirs = fs.readdirSync(dir);
@@ -103,14 +137,16 @@ async function deployToAWSWithSDK() {
       Body: fileStream,
       ContentType: contentType
     }));
-    console.log(`  └─ Uploaded: ${relativePath}`);
+    console.log(`  └─ Uploaded to AWS: ${relativePath}`);
   }
 
-  console.log('\n🎉 AWS DEPLOYMENT COMPLETE!');
-  console.log(`🌐 Live AWS S3 Web App URL: http://${awsBucket}.s3-website-${awsRegion}.amazonaws.com/`);
+  console.log('\n===================================================================');
+  console.log('🎉 AWS DEPLOYMENT SUCCESSFUL!');
+  console.log(`🌐 Live AWS S3 URL: http://${awsBucket}.s3-website-${awsRegion}.amazonaws.com/`);
+  console.log('===================================================================\n');
 }
 
-deployToAWSWithSDK().catch(err => {
+promptAndDeployAWS().catch(err => {
   console.error('❌ AWS Deployment Error:', err.message || err);
   process.exit(1);
 });
