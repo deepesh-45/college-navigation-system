@@ -86,6 +86,12 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
     setCurrentStepIndex(prev => Math.max(0, prev - 1));
   };
 
+  // Calculate target turn angle relative to phone's current heading
+  const relativeTargetAngle = activeStep ? (activeStep.headingDegrees - compassHeading + 360) % 360 : 0;
+  
+  // Calculate needle counter-rotation angle so Red North pointer ALWAYS points to true North
+  const needleRotationAngle = (360 - compassHeading) % 360;
+
   return (
     <div className="w-full flex-1 flex flex-col justify-between rounded-2xl p-2.5 sm:p-3.5 border border-slate-200 shadow-md bg-white/95 backdrop-blur-md font-l3 space-y-2.5 overflow-hidden">
       
@@ -127,28 +133,28 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
         {/* CENTERED COMPASS DIAL */}
         <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-white border-4 border-blue-100 shadow-xl flex items-center justify-center shrink-0">
           
-          {/* Cardinal Markers */}
+          {/* Cardinal Markers on Phone Viewport */}
           <span className="absolute top-1 text-[10px] font-black text-rose-600">N (0°)</span>
           <span className="absolute bottom-1 text-[10px] font-black text-slate-400">S (180°)</span>
           <span className="absolute right-1.5 text-[10px] font-black text-slate-400">E (90°)</span>
           <span className="absolute left-1.5 text-[10px] font-black text-slate-400">W (270°)</span>
 
-          {/* TARGET DIRECTION GREEN BEACON */}
+          {/* TARGET DIRECTION GREEN BEACON (Relative to current phone direction) */}
           {activeStep && (
             <div
               className="absolute w-full h-full flex items-center justify-center pointer-events-none transition-transform duration-500 z-10"
-              style={{ transform: `rotate(${activeStep.headingDegrees}deg)` }}
+              style={{ transform: `rotate(${relativeTargetAngle}deg)` }}
             >
-              <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-lg -translate-y-14 sm:-translate-y-18 animate-ping" />
+              <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-lg -translate-y-14 sm:-translate-y-18 animate-ping" />
             </div>
           )}
 
-          {/* SIMPLE UNAMBIGUOUS COMPASS NEEDLE (Red North Tip 🔴 / Slate South Tail ⚪) */}
+          {/* ACCURATE COMPASS NEEDLE (Counter-rotates so Red North 🔴 ALWAYS points to physical North) */}
           <div
             className="relative w-full h-full flex items-center justify-center pointer-events-none transition-transform duration-300 z-20"
-            style={{ transform: `rotate(${compassHeading}deg)` }}
+            style={{ transform: `rotate(${needleRotationAngle}deg)` }}
           >
-            {/* North Red Pointer 🔴 */}
+            {/* North Red Pointer 🔴 (Points directly to Physical North) */}
             <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-b-[48px] sm:border-b-[58px] border-b-rose-600 drop-shadow flex items-center justify-center">
               <span className="text-[9px] font-black text-white -translate-y-5">N</span>
             </div>
@@ -164,7 +170,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
             </div>
           </div>
 
-          {/* Live Heading Angle Badge */}
+          {/* Live Phone Heading Angle Badge */}
           <div className="absolute bottom-2 px-2 py-0.5 rounded-full bg-slate-900/90 text-white font-extrabold text-[9px] shadow z-30">
             {compassHeading}° N
           </div>
