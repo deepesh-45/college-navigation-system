@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { BUILDINGS, NAV_NODES } from '../data/campusData';
 import { RouteResult } from '../types';
-import { Navigation, Compass, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Navigation, Compass, ZoomIn, ZoomOut, RotateCcw, Satellite, Map as MapIcon } from 'lucide-react';
+import { GoogleCampusMap } from './GoogleCampusMap';
 
 interface MapRendererProps {
   activeRoute?: RouteResult | null;
@@ -9,6 +10,7 @@ interface MapRendererProps {
 }
 
 export const MapRenderer: React.FC<MapRendererProps> = ({ activeRoute }) => {
+  const [mapType, setMapType] = useState<'svg' | 'google_satellite'>('svg');
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
@@ -24,6 +26,23 @@ export const MapRenderer: React.FC<MapRendererProps> = ({ activeRoute }) => {
   // Convert route path to SVG Polyline points
   const routePoints = activeRoute?.nodes.map(n => `${n.x},${n.y}`).join(' ');
 
+  if (mapType === 'google_satellite') {
+    return (
+      <div className="relative w-full h-full flex flex-col">
+        <div className="absolute top-4 right-4 z-30">
+          <button
+            onClick={() => setMapType('svg')}
+            className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 text-xs font-bold shadow-md flex items-center gap-1.5"
+          >
+            <MapIcon className="w-3.5 h-3.5 text-[#1d4ed8]" />
+            Switch to 2D SVG Map
+          </button>
+        </div>
+        <GoogleCampusMap activeRoute={activeRoute} />
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-full glass-panel-light rounded-3xl overflow-hidden border border-slate-200 shadow-xl flex flex-col bg-white">
       {/* Map Top Bar Controls */}
@@ -37,6 +56,15 @@ export const MapRenderer: React.FC<MapRendererProps> = ({ activeRoute }) => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Google Satellite Mode Switcher Button */}
+          <button
+            onClick={() => setMapType('google_satellite')}
+            className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm mr-2"
+          >
+            <Satellite className="w-3.5 h-3.5" />
+            Google Satellite View
+          </button>
+
           <button
             onClick={handleZoomIn}
             className="p-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-all shadow-sm"
