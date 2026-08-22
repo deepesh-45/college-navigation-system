@@ -6,11 +6,9 @@ import { VantaBackground } from './VantaBackground';
 
 interface GreetingScreenProps {
   onSelectRole: (role: string) => void;
-  onOpenCollector?: () => void;
-  onOpenMobileCollector?: () => void;
 }
 
-export const GreetingScreen: React.FC<GreetingScreenProps> = ({ onSelectRole, onOpenCollector, onOpenMobileCollector }) => {
+export const GreetingScreen: React.FC<GreetingScreenProps> = ({ onSelectRole }) => {
   const greetings = [
     { text: 'नमस्कारम्!', font: 'font-alkatra', lang: 'Hindi', gradient: 'text-gradient-namaskaram' },
     { text: 'Hello!', font: 'font-patua', lang: 'English', gradient: 'text-gradient-hello' },
@@ -84,28 +82,6 @@ export const GreetingScreen: React.FC<GreetingScreenProps> = ({ onSelectRole, on
         </div>
 
         <div className="flex items-center gap-2">
-          {onOpenMobileCollector && (
-            <button
-              onClick={onOpenMobileCollector}
-              className="font-l3 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
-              title="Record single block campus nodes with phone sensors & GPS"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-              Mobile Block Collector
-            </button>
-          )}
-
-          {onOpenCollector && (
-            <button
-              onClick={onOpenCollector}
-              className="font-l3 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
-              title="Interactive Visual Map Data Collector"
-            >
-              <Compass className="w-3.5 h-3.5 text-[#1d4ed8]" />
-              Map Collector
-            </button>
-          )}
-
           <span className="font-l3 px-3 py-1 text-xs font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
             AI Voice Ready

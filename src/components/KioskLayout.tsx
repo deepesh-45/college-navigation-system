@@ -15,16 +15,13 @@ import { RouteResult, VoiceState } from '../types';
 
 import { Navigation, QrCode, Search, Layers, Sparkles, RefreshCw, Home } from 'lucide-react';
 
-import { MobileDataCollector } from './MobileDataCollector';
-import { CampusDataCollector } from './CampusDataCollector';
-
 export const KioskLayout: React.FC = () => {
   // Mobile mode check
   const isMobilePath = window.location.pathname === '/mobile' || window.location.search.includes('dest=');
   const [isMobileMode, setIsMobileMode] = useState<boolean>(isMobilePath);
 
-  // Screen Flow Management (Screen 1: greeting, Screen 2: kiosk, Screen 3: collector, Screen 4: mobile_collector)
-  const [currentScreen, setCurrentScreen] = useState<'greeting' | 'kiosk' | 'collector' | 'mobile_collector'>('greeting');
+  // Screen Flow Management (Screen 1: greeting, Screen 2: kiosk)
+  const [currentScreen, setCurrentScreen] = useState<'greeting' | 'kiosk'>('greeting');
   const [userRole, setUserRole] = useState<string>('Visitor');
 
   // Kiosk Voice State
@@ -138,23 +135,7 @@ export const KioskLayout: React.FC = () => {
 
   // RENDER FIRST SCREEN: GREETING SCREEN
   if (currentScreen === 'greeting') {
-    return (
-      <GreetingScreen
-        onSelectRole={handleSelectRole}
-        onOpenCollector={() => setCurrentScreen('collector')}
-        onOpenMobileCollector={() => setCurrentScreen('mobile_collector')}
-      />
-    );
-  }
-
-  // RENDER CAMPUS DATA COLLECTOR / MAPPER SCREEN
-  if (currentScreen === 'collector') {
-    return <CampusDataCollector onBack={() => setCurrentScreen('greeting')} />;
-  }
-
-  // RENDER MOBILE SENSOR DATA COLLECTOR SCREEN
-  if (currentScreen === 'mobile_collector') {
-    return <MobileDataCollector onBack={() => setCurrentScreen('greeting')} />;
+    return <GreetingScreen onSelectRole={handleSelectRole} />;
   }
 
   // RENDER SECOND SCREEN: MAIN KIOSK VOICE & NAVIGATION SCREEN
