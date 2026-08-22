@@ -11,7 +11,17 @@ export interface LLMStepInstruction {
 
 export interface LLMRouteKnowledge {
   id: string;
-  category: 'washroom' | 'lab' | 'cabin' | 'classroom' | 'facility' | 'entrance' | 'canteen';
+  category:
+    | 'washroom'
+    | 'watercooler'
+    | 'lab'
+    | 'cabin'
+    | 'classroom'
+    | 'auditorium'
+    | 'library'
+    | 'facility'
+    | 'entrance'
+    | 'canteen';
   destinationName: string;
   aliases: string[];
   startPoint: string;

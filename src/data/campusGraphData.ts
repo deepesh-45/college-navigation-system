@@ -1,7 +1,20 @@
 export interface GraphNode {
   id: string;
   name: string;
-  type: 'entrance' | 'junction' | 'staircase' | 'elevator' | 'washroom' | 'lab' | 'cabin' | 'facility' | 'canteen';
+  type:
+    | 'entrance'
+    | 'junction'
+    | 'staircase'
+    | 'elevator'
+    | 'washroom'
+    | 'watercooler'
+    | 'classroom'
+    | 'lab'
+    | 'cabin'
+    | 'auditorium'
+    | 'library'
+    | 'canteen'
+    | 'facility';
   building: string;
   floor: number;
   aliases: string[];

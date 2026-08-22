@@ -17,15 +17,17 @@ export const synthesizeCampusCorpusWithGemini = async (
     return fallbackLocalCorpusParser(rawTranscriptText);
   }
 
-  const systemPrompt = `You are an expert AI Spatial Graph Architect for College Navigation.
+  const systemPrompt = `You are an expert AI Spatial Graph Architect for Smart Campus Navigation.
 Analyze the following natural language spoken campus walk transcript and extract a complete, floor-wise spatial graph and step-by-step route permutations.
 
-REQUIRED RULES FOR OUTPUT JSON:
-1. Extract all physical locations/junctions/landmarks as atomic Graph Nodes (e.g. main_entrance, junction_1, staircase_f1, data_science_lab_f2).
-2. Assign each node a floor number (e.g. Ground Floor = 0, First Floor = 1, Second Floor = 2).
-3. Identify Staircase and Elevator nodes as special inter-floor connectors.
-4. Extract directional edges between adjacent nodes with stepsCount, headingText (N, E, S, W, straight, left, right), and standard instruction prompt format ("Move straight approx N steps and [turn left/turn right/take stairs up/take stairs down/reach destination]").
-5. For inter-floor travel (e.g. from Floor 1 to Floor 2), routing MUST first direct the user to the Staircase/Elevator node on the current floor, then climb/descend stairs, then navigate on target floor to destination.
+STRICT TAXONOMY & SCHEMA RULES:
+1. Every physical location MUST be classified into one of these exact node types:
+   ['entrance', 'junction', 'staircase', 'elevator', 'washroom', 'watercooler', 'classroom', 'lab', 'cabin', 'auditorium', 'library', 'canteen', 'facility']
+2. Assign each node a floor number (Ground Floor = 0, First Floor = 1, Second Floor = 2, Third Floor = 3).
+3. Identify Staircase and Elevator nodes as special inter-floor connectors linking adjacent floors.
+4. Extract directional edges between adjacent nodes with stepsCount, headingText (straight, turn left, turn right, take stairs up, take stairs down, take elevator), and standard instruction prompt format ("Move straight approx N steps and [action].").
+5. Format every step instruction strictly as:
+   "Move straight approx [N] steps and [turn left / turn right / take stairs up / take stairs down / take elevator / reach destination]."
 
 Raw Spoken Campus Transcript:
 "${rawTranscriptText}"
@@ -39,7 +41,7 @@ Return strictly raw valid JSON with the following structure (no markdown formatt
       "aliases": ["alias1", "alias2"],
       "building": "Main Building",
       "floor": 1,
-      "type": "classroom|lab|cabin|facility|washroom|entrance|staircase|elevator|junction"
+      "type": "classroom|staircase|elevator|entrance|junction|washroom|watercooler|cabin|auditorium|lab|library|canteen|facility"
     }
   ],
   "edges": [
@@ -69,11 +71,11 @@ Return strictly raw valid JSON with the following structure (no markdown formatt
       "steps": [
         {
           "stepNumber": 1,
-          "instruction": "Move straight approx 10 steps and continue straight.",
-          "headingDegrees": 0,
-          "headingText": "straight",
+          "instruction": "Move straight approx 10 steps and turn left.",
+          "headingDegrees": 270,
+          "headingText": "turn left",
           "stepsCount": 10,
-          "voicePrompt": "Move straight approx 10 steps and continue straight."
+          "voicePrompt": "Move straight approx 10 steps and turn left."
         }
       ]
     }
@@ -144,24 +146,34 @@ const fallbackLocalCorpusParser = (text: string): GeminiCorpusSynthesizerResult 
       currentFloor = 2;
     } else if (lower.includes('ground floor') || lower.includes('floor 0')) {
       currentFloor = 0;
+    } else if (lower.includes('third floor') || lower.includes('floor 3')) {
+      currentFloor = 3;
     }
 
     // Determine Action Type
-    let actionText = 'straight';
+    let actionText = 'continue straight';
     let headingDegrees = 0;
     if (lower.includes('left')) { actionText = 'turn left'; headingDegrees = 270; }
     else if (lower.includes('right')) { actionText = 'turn right'; headingDegrees = 90; }
     else if (lower.includes('stairs') || lower.includes('upward')) { actionText = 'take stairs up'; headingDegrees = 0; }
     else if (lower.includes('down')) { actionText = 'take stairs down'; headingDegrees = 180; }
 
-    // Extract Location Name
+    // Extract Location Name & Taxonomy Classification
     let locName = `Node ${idx + 1}`;
-    if (lower.includes('junction')) locName = 'Hallway Junction';
-    else if (lower.includes('stairs')) locName = `Staircase Floor ${currentFloor}`;
-    else if (lower.includes('data science lab')) locName = 'Data Science Lab';
-    else if (lower.includes('ai lab')) locName = 'AI Research Lab';
-    else if (lower.includes('washroom')) locName = 'Restroom Facilities';
-    else if (lower.includes('canteen')) locName = 'Campus Canteen';
+    let nodeType: GraphNode['type'] = 'facility';
+
+    if (lower.includes('junction')) { locName = 'Hallway Junction'; nodeType = 'junction'; }
+    else if (lower.includes('stairs')) { locName = `Staircase Floor ${currentFloor}`; nodeType = 'staircase'; }
+    else if (lower.includes('elevator') || lower.includes('lift')) { locName = `Elevator Floor ${currentFloor}`; nodeType = 'elevator'; }
+    else if (lower.includes('data science lab')) { locName = 'Data Science Lab'; nodeType = 'lab'; }
+    else if (lower.includes('ai lab') || lower.includes('research lab')) { locName = 'AI Research Lab'; nodeType = 'lab'; }
+    else if (lower.includes('classroom') || lower.includes('room')) { locName = 'Classroom'; nodeType = 'classroom'; }
+    else if (lower.includes('washroom') || lower.includes('restroom')) { locName = 'Washroom'; nodeType = 'washroom'; }
+    else if (lower.includes('watercooler') || lower.includes('water')) { locName = 'Water Cooler Station'; nodeType = 'watercooler'; }
+    else if (lower.includes('cabin') || lower.includes('faculty')) { locName = 'Faculty Cabin'; nodeType = 'cabin'; }
+    else if (lower.includes('auditorium')) { locName = 'Main Auditorium'; nodeType = 'auditorium'; }
+    else if (lower.includes('library')) { locName = 'Central Library'; nodeType = 'library'; }
+    else if (lower.includes('canteen')) { locName = 'Campus Canteen'; nodeType = 'canteen'; }
 
     const nodeId = locName.toLowerCase().replace(/[^a-z0-9]/g, '_');
     
@@ -172,7 +184,7 @@ const fallbackLocalCorpusParser = (text: string): GeminiCorpusSynthesizerResult 
         aliases: [locName.toLowerCase()],
         building: 'Main Campus',
         floor: currentFloor,
-        type: lower.includes('lab') ? 'lab' : lower.includes('stairs') ? 'staircase' : 'facility'
+        type: nodeType
       });
     }
 
@@ -206,7 +218,7 @@ const fallbackLocalCorpusParser = (text: string): GeminiCorpusSynthesizerResult 
     const lastNode = nodes[nodes.length - 1];
     routes.push({
       id: `ROUTE_${lastNode.id}`,
-      category: 'lab',
+      category: lastNode.type === 'washroom' ? 'washroom' : lastNode.type === 'watercooler' ? 'watercooler' : lastNode.type === 'lab' ? 'lab' : lastNode.type === 'cabin' ? 'cabin' : lastNode.type === 'classroom' ? 'classroom' : lastNode.type === 'auditorium' ? 'auditorium' : lastNode.type === 'library' ? 'library' : lastNode.type === 'canteen' ? 'canteen' : 'facility',
       destinationName: lastNode.name,
       aliases: lastNode.aliases,
       startPoint: 'Main Entrance',
