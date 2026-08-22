@@ -86,11 +86,8 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
     setCurrentStepIndex(prev => Math.max(0, prev - 1));
   };
 
-  // Calculate target turn angle relative to phone's current heading
-  const relativeTargetAngle = activeStep ? (activeStep.headingDegrees - compassHeading + 360) % 360 : 0;
-  
-  // Calculate needle counter-rotation angle so Red North pointer ALWAYS points to true North
-  const needleRotationAngle = (360 - compassHeading) % 360;
+  // Rotating Dial Angle (-compassHeading so the dial rotates under the fixed top pin)
+  const dialRotationAngle = (360 - compassHeading) % 360;
 
   return (
     <div className="w-full flex-1 flex flex-col justify-between rounded-2xl p-2.5 sm:p-3.5 border border-slate-200 shadow-md bg-white/95 backdrop-blur-md font-l3 space-y-2.5 overflow-hidden">
@@ -127,52 +124,61 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
         )}
       </div>
 
-      {/* CENTERED LARGE 360° COMPASS & STEP COUNTER */}
+      {/* CENTERED ROTATING 360° COMPASS DIAL WITH FIXED TOP POINTER PIN */}
       <div className="flex-1 flex flex-col items-center justify-center space-y-2 my-auto">
         
-        {/* CENTERED COMPASS DIAL */}
-        <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-white border-4 border-blue-100 shadow-xl flex items-center justify-center shrink-0">
+        {/* COMPASS CONTAINER */}
+        <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-full bg-slate-900 border-4 border-blue-600 shadow-2xl flex items-center justify-center shrink-0 p-1">
           
-          {/* Cardinal Markers on Phone Viewport */}
-          <span className="absolute top-1 text-[10px] font-black text-rose-600">N (0°)</span>
-          <span className="absolute bottom-1 text-[10px] font-black text-slate-400">S (180°)</span>
-          <span className="absolute right-1.5 text-[10px] font-black text-slate-400">E (90°)</span>
-          <span className="absolute left-1.5 text-[10px] font-black text-slate-400">W (270°)</span>
-
-          {/* TARGET DIRECTION GREEN BEACON (Relative to current phone direction) */}
-          {activeStep && (
-            <div
-              className="absolute w-full h-full flex items-center justify-center pointer-events-none transition-transform duration-500 z-10"
-              style={{ transform: `rotate(${relativeTargetAngle}deg)` }}
-            >
-              <div className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-lg -translate-y-14 sm:-translate-y-18 animate-ping" />
-            </div>
-          )}
-
-          {/* ACCURATE COMPASS NEEDLE (Counter-rotates so Red North 🔴 ALWAYS points to physical North) */}
-          <div
-            className="relative w-full h-full flex items-center justify-center pointer-events-none transition-transform duration-300 z-20"
-            style={{ transform: `rotate(${needleRotationAngle}deg)` }}
-          >
-            {/* North Red Pointer 🔴 (Points directly to Physical North) */}
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-b-[48px] sm:border-b-[58px] border-b-rose-600 drop-shadow flex items-center justify-center">
-              <span className="text-[9px] font-black text-white -translate-y-5">N</span>
-            </div>
-
-            {/* Center Pivot Ring */}
-            <div className="w-4 h-4 rounded-full bg-slate-900 border-2 border-white shadow-md z-30 flex items-center justify-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            </div>
-
-            {/* South Slate Pointer ⚪ */}
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[48px] sm:border-t-[58px] border-t-slate-400 drop-shadow opacity-75 flex items-center justify-center">
-              <span className="text-[9px] font-black text-white translate-y-5">S</span>
-            </div>
+          {/* FIXED TOP HEADING POINTER PIN (Always points down at current degree under 12 o'clock) */}
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
+            <div className="w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[16px] border-t-rose-600 drop-shadow-md" />
           </div>
 
-          {/* Live Phone Heading Angle Badge */}
-          <div className="absolute bottom-2 px-2 py-0.5 rounded-full bg-slate-900/90 text-white font-extrabold text-[9px] shadow z-30">
-            {compassHeading}° N
+          {/* ROTATING COMPASS DIAL WHEEL (Rotates by -compassHeading) */}
+          <div
+            className="w-full h-full rounded-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border border-slate-700/80 relative flex items-center justify-center transition-transform duration-300 pointer-events-none"
+            style={{ transform: `rotate(${dialRotationAngle}deg)` }}
+          >
+            {/* North 0° Marker in Bright Red */}
+            <div className="absolute top-1 flex flex-col items-center">
+              <span className="text-[11px] font-black text-rose-500 tracking-wider">N</span>
+              <span className="text-[7px] font-extrabold text-rose-400">0°</span>
+            </div>
+
+            {/* East 90° Marker */}
+            <div className="absolute right-1.5 flex items-center gap-0.5">
+              <span className="text-[10px] font-black text-slate-300">E</span>
+              <span className="text-[7px] font-bold text-slate-400">90°</span>
+            </div>
+
+            {/* South 180° Marker */}
+            <div className="absolute bottom-1 flex flex-col items-center">
+              <span className="text-[7px] font-bold text-slate-400">180°</span>
+              <span className="text-[10px] font-black text-slate-300">S</span>
+            </div>
+
+            {/* West 270° Marker */}
+            <div className="absolute left-1.5 flex items-center gap-0.5">
+              <span className="text-[7px] font-bold text-slate-400">270°</span>
+              <span className="text-[10px] font-black text-slate-300">W</span>
+            </div>
+
+            {/* TARGET TURN DIRECTION BEACON (Positioned on the rotating compass dial) */}
+            {activeStep && (
+              <div
+                className="absolute w-full h-full flex items-center justify-center transition-transform duration-500 z-10"
+                style={{ transform: `rotate(${activeStep.headingDegrees}deg)` }}
+              >
+                <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white shadow-lg -translate-y-13 sm:-translate-y-16 animate-ping" />
+              </div>
+            )}
+          </div>
+
+          {/* CENTER HEADING BADGE */}
+          <div className="absolute w-12 h-12 rounded-full bg-slate-950 border-2 border-blue-500 shadow-md flex flex-col items-center justify-center text-white z-20 pointer-events-none">
+            <span className="text-[11px] font-black text-emerald-400 leading-none">{compassHeading}°</span>
+            <span className="text-[7px] font-extrabold text-slate-400 uppercase tracking-tighter mt-0.5">Heading</span>
           </div>
         </div>
 
