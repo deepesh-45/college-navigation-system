@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mic, MicOff, Sparkles, CheckCircle2, Copy, Download, RefreshCw, X, FileText, Database, Plus, Layers } from 'lucide-react';
-import { LLM_ROUTES_KNOWLEDGE } from '../data/llmRoutesKnowledge';
-import { CAMPUS_NODES, CAMPUS_EDGES } from '../data/campusGraphData';
+import { LLM_ROUTES_KNOWLEDGE, saveLLMRoutesToStorage } from '../data/llmRoutesKnowledge';
+import { CAMPUS_NODES, CAMPUS_EDGES, saveCampusGraphToStorage } from '../data/campusGraphData';
 import { synthesizeCampusCorpusWithGemini } from '../services/geminiCorpusSynthesizer';
 import { speechService } from '../services/speechService';
 
@@ -76,7 +76,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose }) => 
     setFloorCorpusMap(prev => ({ ...prev, [nextFloor]: '' }));
   };
 
-  // Synthesize Corpus for All Floors with Gemini AI
+  // Synthesize Corpus for All Floors with Gemini AI & Save Automatically to Device Storage
   const handleSynthesizeAllFloorsWithGemini = async () => {
     const combinedCorpus = Object.entries(floorCorpusMap)
       .map(([floor, corpus]) => `[FLOOR ${floor} CORPUS]: ${corpus}`)
@@ -107,9 +107,13 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose }) => 
       }
     });
 
+    // Save automatically to device storage (localStorage)
+    saveCampusGraphToStorage();
+    saveLLMRoutesToStorage();
+
     setIsSynthesizing(false);
-    setSynthesisResultMsg(result.summaryText);
-    speechService.speak('Floor-wise dataset synthesized successfully with Gemini AI!');
+    setSynthesisResultMsg(result.summaryText + ' 💾 Saved automatically to your device!');
+    speechService.speak('Floor-wise dataset synthesized and saved automatically to your device!');
   };
 
   const generateExportCode = () => {
@@ -147,6 +151,8 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
       CAMPUS_NODES.length = 0;
       CAMPUS_EDGES.length = 0;
       LLM_ROUTES_KNOWLEDGE.length = 0;
+      saveCampusGraphToStorage();
+      saveLLMRoutesToStorage();
       setFloorCorpusMap({ 1: '' });
       setSynthesisResultMsg('All datasets cleared! Ready for new floor-wise recordings.');
     }

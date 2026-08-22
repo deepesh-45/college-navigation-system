@@ -33,5 +33,22 @@ export interface LLMRouteKnowledge {
   steps: LLMStepInstruction[];
 }
 
-// Clean dataset array for real campus data collection
-export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [];
+// Load saved LLM routes from device localStorage if available
+const loadSavedRoutes = (): LLMRouteKnowledge[] => {
+  try {
+    const saved = localStorage.getItem('SAVED_LLM_ROUTES');
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = loadSavedRoutes();
+
+export const saveLLMRoutesToStorage = () => {
+  try {
+    localStorage.setItem('SAVED_LLM_ROUTES', JSON.stringify(LLM_ROUTES_KNOWLEDGE));
+  } catch (e) {
+    console.warn('Storage save notice:', e);
+  }
+};

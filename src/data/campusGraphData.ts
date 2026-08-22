@@ -32,6 +32,33 @@ export interface GraphEdge {
   isStaircaseOrElevator?: boolean;
 }
 
-// Clean atomic graph arrays for real campus data collection
-export const CAMPUS_NODES: GraphNode[] = [];
-export const CAMPUS_EDGES: GraphEdge[] = [];
+// Load saved nodes & edges from device localStorage if available
+const loadSavedNodes = (): GraphNode[] => {
+  try {
+    const saved = localStorage.getItem('SAVED_CAMPUS_NODES');
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+const loadSavedEdges = (): GraphEdge[] => {
+  try {
+    const saved = localStorage.getItem('SAVED_CAMPUS_EDGES');
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const CAMPUS_NODES: GraphNode[] = loadSavedNodes();
+export const CAMPUS_EDGES: GraphEdge[] = loadSavedEdges();
+
+export const saveCampusGraphToStorage = () => {
+  try {
+    localStorage.setItem('SAVED_CAMPUS_NODES', JSON.stringify(CAMPUS_NODES));
+    localStorage.setItem('SAVED_CAMPUS_EDGES', JSON.stringify(CAMPUS_EDGES));
+  } catch (e) {
+    console.warn('Storage save notice:', e);
+  }
+};
