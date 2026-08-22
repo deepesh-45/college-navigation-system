@@ -46,7 +46,7 @@ export class SensorService {
     };
   }
 
-  // Watch Accelerometer for Indoor Step Counting (Dead Reckoning approximation)
+  // Watch Accelerometer for Indoor Step Counting
   public watchStepCounter(onStepDetected: (currentSteps: number) => void): () => void {
     this.stepCount = 0;
     this.lastAccelMag = 0;
@@ -72,6 +72,39 @@ export class SensorService {
     return () => {
       window.removeEventListener('devicemotion', handleMotion, true);
     };
+  }
+
+  // Trigger Smartphone Haptic Vibration Feedback
+  public triggerHapticFeedback(pattern: number[] = [80]): void {
+    if ('vibrate' in navigator) {
+      try {
+        navigator.vibrate(pattern);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  // Play Pleasant Arrival Audio Chime (Web Audio API)
+  public playArrivalChime(): void {
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const audioCtx = new AudioContextClass();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 tone
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); // A5 tone
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.5);
+    } catch (e) {
+      // ignore
+    }
   }
 
   public getStepCount(): number {

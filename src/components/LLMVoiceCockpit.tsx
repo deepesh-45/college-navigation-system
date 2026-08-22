@@ -40,9 +40,12 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, onArriv
   };
 
   const handleNextStep = () => {
+    sensorService.triggerHapticFeedback([60]);
     if (currentStepIndex < route.steps.length - 1) {
       setCurrentStepIndex(prev => prev + 1);
     } else {
+      sensorService.playArrivalChime();
+      sensorService.triggerHapticFeedback([100, 50, 100]);
       if (onArrived) onArrived();
     }
   };
