@@ -121,81 +121,99 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
         )}
       </div>
 
-      {/* PROMINENT DIRECTION ACTION CARD (NO COMPASS) */}
+      {/* INTERACTIVE CLICKABLE DIRECTION ACTION CARD BUTTON (COMPLETES STEP ON CLICK) */}
       <div className="flex-1 flex flex-col items-center justify-center space-y-3.5 my-auto">
         
-        {/* BIG DIRECTION ACTION CARD */}
+        {/* CLICKABLE DIRECTION ACTION CARD BUTTON */}
         <div className="w-full max-w-sm">
           {actionType === 'left' && (
-            <div className="w-full p-4 sm:p-5 rounded-2xl bg-amber-500 text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-amber-400">
-              <ArrowLeft className="w-10 h-10 animate-pulse" />
+            <button
+              onClick={handleNextStep}
+              className="w-full p-4 sm:p-5 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-amber-400 cursor-pointer group"
+            >
+              <ArrowLeft className="w-10 h-10 animate-pulse group-hover:scale-110 transition-transform" />
               <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
                 TURN LEFT AFTER {targetSteps} STEPS
               </span>
-              <span className="text-xs font-semibold text-amber-100">
-                Walk {targetSteps} steps forward then turn left
+              <span className="text-xs font-black bg-amber-600 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
+                👉 Tap to Complete Step & Continue ➔
               </span>
-            </div>
+            </button>
           )}
 
           {actionType === 'right' && (
-            <div className="w-full p-4 sm:p-5 rounded-2xl bg-amber-500 text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-amber-400">
-              <ArrowRight className="w-10 h-10 animate-pulse" />
+            <button
+              onClick={handleNextStep}
+              className="w-full p-4 sm:p-5 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-amber-400 cursor-pointer group"
+            >
+              <ArrowRight className="w-10 h-10 animate-pulse group-hover:scale-110 transition-transform" />
               <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
                 TURN RIGHT AFTER {targetSteps} STEPS
               </span>
-              <span className="text-xs font-semibold text-amber-100">
-                Walk {targetSteps} steps forward then turn right
+              <span className="text-xs font-black bg-amber-600 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
+                👉 Tap to Complete Step & Continue ➔
               </span>
-            </div>
+            </button>
           )}
 
           {actionType === 'straight' && (
-            <div className="w-full p-4 sm:p-5 rounded-2xl bg-blue-600 text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-blue-500">
-              <ArrowUp className="w-10 h-10 animate-pulse" />
+            <button
+              onClick={handleNextStep}
+              className="w-full p-4 sm:p-5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-blue-500 cursor-pointer group"
+            >
+              <ArrowUp className="w-10 h-10 animate-pulse group-hover:scale-110 transition-transform" />
               <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
                 WALK STRAIGHT FOR {targetSteps} STEPS
               </span>
-              <span className="text-xs font-semibold text-blue-100">
-                Continue walking straight along the hallway
+              <span className="text-xs font-black bg-blue-800 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
+                👉 Tap to Complete Step & Continue ➔
               </span>
-            </div>
+            </button>
           )}
 
           {actionType === 'stair_up' && (
-            <div className="w-full p-4 sm:p-5 rounded-2xl bg-indigo-600 text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-indigo-500">
-              <ArrowUpRight className="w-10 h-10 animate-bounce" />
+            <button
+              onClick={handleNextStep}
+              className="w-full p-4 sm:p-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-indigo-500 cursor-pointer group"
+            >
+              <ArrowUpRight className="w-10 h-10 animate-bounce group-hover:scale-110 transition-transform" />
               <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
                 CLIMB STAIRS UP 🪜
               </span>
-              <span className="text-xs font-semibold text-indigo-100">
-                Take the staircase up to the next floor
+              <span className="text-xs font-black bg-indigo-800 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
+                👉 Tap to Complete Floor Climb & Continue ➔
               </span>
-            </div>
+            </button>
           )}
 
           {actionType === 'stair_down' && (
-            <div className="w-full p-4 sm:p-5 rounded-2xl bg-purple-600 text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-purple-500">
-              <ArrowDownRight className="w-10 h-10 animate-bounce" />
+            <button
+              onClick={handleNextStep}
+              className="w-full p-4 sm:p-5 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-purple-500 cursor-pointer group"
+            >
+              <ArrowDownRight className="w-10 h-10 animate-bounce group-hover:scale-110 transition-transform" />
               <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
                 GO STAIRS DOWN 🪜
               </span>
-              <span className="text-xs font-semibold text-purple-100">
-                Take the staircase down to the lower floor
+              <span className="text-xs font-black bg-purple-800 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
+                👉 Tap to Complete Floor Descent & Continue ➔
               </span>
-            </div>
+            </button>
           )}
 
           {actionType === 'elevator' && (
-            <div className="w-full p-4 sm:p-5 rounded-2xl bg-cyan-600 text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-cyan-500">
-              <Layers className="w-10 h-10 animate-pulse" />
+            <button
+              onClick={handleNextStep}
+              className="w-full p-4 sm:p-5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 transition-all text-white shadow-xl flex flex-col items-center justify-center text-center space-y-2 border-2 border-cyan-500 cursor-pointer group"
+            >
+              <Layers className="w-10 h-10 animate-pulse group-hover:scale-110 transition-transform" />
               <span className="font-black text-lg sm:text-xl uppercase tracking-wide">
                 TAKE ELEVATOR 🛗
               </span>
-              <span className="text-xs font-semibold text-cyan-100">
-                Enter elevator and select destination floor
+              <span className="text-xs font-black bg-cyan-800 px-3 py-1 rounded-full text-white shadow-inner flex items-center gap-1">
+                👉 Tap to Complete Elevator Ride & Continue ➔
               </span>
-            </div>
+            </button>
           )}
         </div>
 
@@ -219,7 +237,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
         </div>
       </div>
 
-      {/* MANUAL COMPLETION STEP BUTTON */}
+      {/* STEP NAVIGATION FOOTER CONTROLS */}
       <div className="flex items-center justify-between gap-2.5">
         <button
           disabled={currentStepIndex === 0}
