@@ -1,6 +1,7 @@
 import { LLM_ROUTES_KNOWLEDGE, LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
 import { CAMPUS_NODES } from '../data/campusGraphData';
 import { findNodeByIdOrAlias, generateRoutePermutationFromGraph } from './graphRouteEngine';
+import { generateRouteDirectlyFromCorpus } from './geminiRouteService';
 
 export interface LLMNavigationResult {
   matched: boolean;
@@ -12,23 +13,17 @@ export interface LLMNavigationResult {
   responseMessage: string;
 }
 
-export const resolveLLMVoiceQuery = (query: string, customStartName?: string): LLMNavigationResult => {
+export const resolveLLMVoiceQueryAsync = async (
+  query: string,
+  customStartName?: string
+): Promise<LLMNavigationResult> => {
   const normalized = query.toLowerCase().trim();
 
   if (!normalized) {
     return {
       matched: false,
       route: null,
-      responseMessage: "I didn't catch that. Please speak your destination, like 'Where is the washroom?' or 'Take me to the AI Lab'."
-    };
-  }
-
-  // Handle completely empty dataset case
-  if (LLM_ROUTES_KNOWLEDGE.length === 0 && CAMPUS_NODES.length === 0) {
-    return {
-      matched: false,
-      route: null,
-      responseMessage: "Dataset is currently empty for real campus data entry. Please use the Admin Panel (top right button, password: admin123) to record real campus routes!"
+      responseMessage: "I didn't catch that. Please speak your destination, like 'Where is the washroom?' or 'Take me to the Data Science Lab'."
     };
   }
 
@@ -49,7 +44,7 @@ export const resolveLLMVoiceQuery = (query: string, customStartName?: string): L
     }
   }
 
-  // 2. Search all matching static LLM routes for ambiguity or direct match
+  // 2. Search static LLM routes for exact or category matches
   const matchingRoutes: LLMRouteKnowledge[] = [];
 
   for (const route of LLM_ROUTES_KNOWLEDGE) {
@@ -64,7 +59,7 @@ export const resolveLLMVoiceQuery = (query: string, customStartName?: string): L
     }
   }
 
-  // 3. Ambiguity Detection: If multiple routes match
+  // Ambiguity Detection
   if (matchingRoutes.length > 1) {
     const destinationNames = matchingRoutes.map(r => r.destinationName).join(' OR ');
     return {
@@ -76,7 +71,7 @@ export const resolveLLMVoiceQuery = (query: string, customStartName?: string): L
     };
   }
 
-  // 4. Single Direct Match
+  // Single Direct Match
   if (matchingRoutes.length === 1) {
     const route = matchingRoutes[0];
     return {
@@ -88,16 +83,67 @@ export const resolveLLMVoiceQuery = (query: string, customStartName?: string): L
     };
   }
 
-  // 5. Fallback: Direct route not found
-  const fallbackRoute = LLM_ROUTES_KNOWLEDGE.length > 0 ? LLM_ROUTES_KNOWLEDGE[0] : null;
-  const nearbyLandmark = fallbackRoute ? fallbackRoute.startPoint : "Campus Main Entrance";
+  // 3. Dynamic Real-Time Gemini AI Direct Corpus Navigation Generation!
+  const corpusSynthesizedRoute = await generateRouteDirectlyFromCorpus(query);
+  if (corpusSynthesizedRoute) {
+    // Cache synthesized route into memory
+    LLM_ROUTES_KNOWLEDGE.push(corpusSynthesizedRoute);
+    return {
+      matched: true,
+      isAmbiguous: false,
+      isNearbyLandmarkFallback: false,
+      route: corpusSynthesizedRoute,
+      responseMessage: `Synthesized step-by-step route to ${corpusSynthesizedRoute.destinationName} directly from campus corpus! Total ${corpusSynthesizedRoute.totalSteps} steps.`
+    };
+  }
 
+  // 4. Fallback: Default route
+  const fallbackRoute = LLM_ROUTES_KNOWLEDGE.length > 0 ? LLM_ROUTES_KNOWLEDGE[0] : null;
   return {
     matched: fallbackRoute !== null,
     isAmbiguous: false,
     isNearbyLandmarkFallback: true,
-    nearbyLandmarkName: nearbyLandmark,
+    nearbyLandmarkName: fallbackRoute ? fallbackRoute.startPoint : "Campus Main Entrance",
     route: fallbackRoute,
-    responseMessage: `⚠️ Direct route for "${query}" not found in dataset. Please use the Admin Panel to record this location!`
+    responseMessage: `⚠️ Could not extract route for "${query}". Redirecting to Main Entrance.`
+  };
+};
+
+// Synchronous wrapper for backward compatibility
+export const resolveLLMVoiceQuery = (query: string, customStartName?: string): LLMNavigationResult => {
+  const normalized = query.toLowerCase().trim();
+  const startNode = CAMPUS_NODES.length > 0 ? (findNodeByIdOrAlias(customStartName || 'main entrance') || CAMPUS_NODES[0]) : null;
+  const destNode = findNodeByIdOrAlias(query);
+
+  if (startNode && destNode && startNode.id !== destNode.id) {
+    const graphRoute = generateRoutePermutationFromGraph(startNode, destNode);
+    if (graphRoute) {
+      return {
+        matched: true,
+        isAmbiguous: false,
+        isNearbyLandmarkFallback: false,
+        route: graphRoute,
+        responseMessage: `Generated optimal route from ${startNode.name} to ${destNode.name}!`
+      };
+    }
+  }
+
+  const matchingRoutes = LLM_ROUTES_KNOWLEDGE.filter(r => 
+    r.destinationName.toLowerCase().includes(normalized) ||
+    r.aliases.some(a => a.toLowerCase().includes(normalized))
+  );
+
+  if (matchingRoutes.length > 0) {
+    return {
+      matched: true,
+      route: matchingRoutes[0],
+      responseMessage: `Found route to ${matchingRoutes[0].destinationName}!`
+    };
+  }
+
+  return {
+    matched: false,
+    route: null,
+    responseMessage: `Route for "${query}" not found.`
   };
 };

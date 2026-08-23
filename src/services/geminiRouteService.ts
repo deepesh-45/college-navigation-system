@@ -1,5 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
 import { LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
+import { GROUND_FLOOR_CORPUS, FIRST_FLOOR_CORPUS } from '../data/corpuses';
 
 export const getGeminiApiKeys = (): { primary: string; fallback: string } => {
   const metaEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
@@ -9,96 +9,83 @@ export const getGeminiApiKeys = (): { primary: string; fallback: string } => {
   };
 };
 
-export const generateLLMRouteWithGemini = async (
-  rawDescription: string,
-  compassHeading: number,
-  stepsWalked: number
+// Generate Step-by-Step Navigation Directly from Raw Spoken Corpuses with Gemini AI
+export const generateRouteDirectlyFromCorpus = async (
+  destinationQuery: string
 ): Promise<LLMRouteKnowledge | null> => {
   const { primary, fallback } = getGeminiApiKeys();
   const apiKeysToTry = [primary, fallback].filter(k => k && !k.includes('DemoApiKey'));
 
-  const systemPrompt = `You are a Smart Campus Navigation AI.
-Convert the user's natural language voice description into a JSON LLMRouteKnowledge object.
+  const systemPrompt = `You are a Smart Campus Navigation AI Engine.
+Analyze the following raw spoken campus walk corpuses and generate a step-by-step navigation route from Main Entrance to the requested destination: "${destinationQuery}".
 
-Rules:
-1. Category must be one of: "washroom", "lab", "cabin", "classroom", "facility", "entrance", "canteen".
-2. Break down the route into step-by-step instructions.
-3. Include compass headings (0=North, 90=East, 180=South, 270=West).
-4. Include step counts.
+RAW CAMPUS CORPUSES:
+[GROUND FLOOR (FLOOR 1)]:
+${GROUND_FLOOR_CORPUS}
 
-JSON Format required:
+[FIRST FLOOR (FLOOR 2)]:
+${FIRST_FLOOR_CORPUS}
+
+RULES:
+1. Carefully analyze the corpuses to extract the required number of steps, directional turns (turn left, turn right, continue straight), and floor transitions via stairs/elevators.
+2. Format EVERY step instruction strictly as:
+   "Move straight approx [N] steps and [turn left / turn right / continue straight / take stairs up / take stairs down / reach destination]."
+3. Calculate totalSteps by summing stepsCount across all steps.
+4. Calculate totalDistanceMeters as Math.round(totalSteps * 0.75).
+5. Return strictly raw valid JSON (no markdown formatting around json) conforming to this structure:
+
 {
-  "id": "ROUTE_CUSTOM_GENERATED",
-  "category": "washroom",
-  "destinationName": "Ground Floor Restroom",
-  "aliases": ["washroom", "toilet", "restroom"],
-  "startPoint": "Main Entrance Lobby",
-  "building": "CSE & AI Block",
-  "floor": 0,
+  "id": "ROUTE_DYNAMIC_CORPUS_${Date.now()}",
+  "category": "lab|classroom|cabin|washroom|watercooler|auditorium|library|canteen|facility",
+  "destinationName": "${destinationQuery}",
+  "aliases": ["${destinationQuery.toLowerCase()}"],
+  "startPoint": "Main Entrance",
+  "building": "Main Campus",
+  "floor": 1,
   "totalSteps": 45,
-  "totalDistanceMeters": 35,
-  "overviewSummary": "Summary of directions...",
+  "totalDistanceMeters": 34,
+  "overviewSummary": "Direct navigation route to ${destinationQuery} synthesized from campus corpus.",
   "steps": [
     {
       "stepNumber": 1,
-      "instruction": "Instruction text...",
+      "instruction": "Move straight approx 15 steps and continue straight.",
       "headingDegrees": 0,
-      "headingText": "North (360°)",
-      "stepsCount": 30,
-      "landmarkHint": "Landmark hint",
-      "voicePrompt": "Voice prompt text"
+      "headingText": "continue straight",
+      "stepsCount": 15,
+      "voicePrompt": "Move straight approx 15 steps and continue straight."
     }
   ]
 }`;
 
-  const userPrompt = `Raw voice input: "${rawDescription}". Current compass heading: ${compassHeading}° N. Current recorded steps: ${stepsWalked}.`;
-
-  // Try Primary Key then Fallback Key
   for (const apiKey of apiKeysToTry) {
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `${systemPrompt}\n\n${userPrompt}`
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: systemPrompt }] }]
+        })
       });
 
-      const text = response.text || '';
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]) as LLMRouteKnowledge;
+      const data = await response.json();
+      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const cleanJsonText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJsonText);
+      if (parsed && parsed.steps && parsed.steps.length > 0) {
+        return parsed as LLMRouteKnowledge;
       }
     } catch (err) {
       console.warn('Gemini API Key attempt notice, trying fallback:', err);
     }
   }
 
-  // Pure Local LLM Structured Fallback Parser
-  const isWashroom = rawDescription.toLowerCase().includes('washroom') || rawDescription.toLowerCase().includes('toilet');
-  const isLab = rawDescription.toLowerCase().includes('lab') || rawDescription.toLowerCase().includes('ai');
-  const category = isWashroom ? 'washroom' : isLab ? 'lab' : 'facility';
-  const name = isWashroom ? 'Ground Floor Restroom' : isLab ? 'Advanced AI Lab CS-204' : 'Campus Landmark';
+  return null;
+};
 
-  return {
-    id: `ROUTE_${Date.now()}`,
-    category,
-    destinationName: name,
-    aliases: [name.toLowerCase(), category],
-    startPoint: 'CSE Block Main Entrance Lobby',
-    building: 'Computer Science & AI Block',
-    floor: 0,
-    totalSteps: stepsWalked > 0 ? stepsWalked : 45,
-    totalDistanceMeters: Math.round((stepsWalked || 45) * 0.75),
-    overviewSummary: rawDescription,
-    steps: [
-      {
-        stepNumber: 1,
-        instruction: `Facing ${compassHeading}° N, ${rawDescription}`,
-        headingDegrees: compassHeading,
-        headingText: `${compassHeading}° N`,
-        stepsCount: stepsWalked || 30,
-        landmarkHint: 'Notice signage ahead',
-        voicePrompt: rawDescription
-      }
-    ]
-  };
+export const generateLLMRouteWithGemini = async (
+  rawDescription: string,
+  _compassHeading?: number,
+  _stepsWalked?: number
+): Promise<LLMRouteKnowledge | null> => {
+  return generateRouteDirectlyFromCorpus(rawDescription);
 };

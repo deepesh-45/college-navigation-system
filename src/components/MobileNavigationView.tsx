@@ -4,7 +4,7 @@ import { AdminPortalView } from './AdminPortalView';
 import { VantaBackground } from './VantaBackground';
 
 import { speechService } from '../services/speechService';
-import { resolveLLMVoiceQuery } from '../services/llmNavigationEngine';
+import { resolveLLMVoiceQueryAsync } from '../services/llmNavigationEngine';
 import { LLMRouteKnowledge, LLM_ROUTES_KNOWLEDGE } from '../data/llmRoutesKnowledge';
 import { VoiceState } from '../types';
 import { sensorService } from '../services/sensorService';
@@ -19,23 +19,54 @@ interface MobileNavigationViewProps {
 const EMPTY_STARTER_ROUTE: LLMRouteKnowledge = {
   id: "STARTER_EMPTY_ROUTE",
   category: "facility",
-  destinationName: "No Routes Yet — Use Admin Panel to Add Campus Data",
-  aliases: ["admin", "add route"],
-  startPoint: "CSE Block Main Entrance Lobby",
+  destinationName: "Data Science Lab",
+  aliases: ["data science lab", "ds lab"],
+  startPoint: "Main Entrance",
   building: "Main Campus Building",
-  floor: 0,
-  totalSteps: 0,
-  totalDistanceMeters: 0,
-  overviewSummary: "Click Admin (password: admin123) to record live compass & accelerometer step data for campus routes!",
+  floor: 1,
+  totalSteps: 79,
+  totalDistanceMeters: 59,
+  overviewSummary: "Step-by-step route to Data Science Lab synthesized from campus corpus.",
   steps: [
     {
       stepNumber: 1,
-      instruction: "Dataset is ready for campus data collection! Open the Admin Panel (top right button) to record real campus routes.",
+      instruction: "Move straight approx 15 steps and continue straight.",
       headingDegrees: 0,
-      headingText: "North (360°)",
-      stepsCount: 0,
-      landmarkHint: "Admin Panel top right button",
-      voicePrompt: "Dataset is ready for campus data collection. Open the Admin panel to add routes."
+      headingText: "continue straight",
+      stepsCount: 15,
+      voicePrompt: "Move straight approx 15 steps and continue straight."
+    },
+    {
+      stepNumber: 2,
+      instruction: "Move straight approx 14 steps and turn left.",
+      headingDegrees: 270,
+      headingText: "turn left",
+      stepsCount: 14,
+      voicePrompt: "Move straight approx 14 steps and turn left."
+    },
+    {
+      stepNumber: 3,
+      instruction: "Move straight approx 20 steps and continue straight.",
+      headingDegrees: 0,
+      headingText: "continue straight",
+      stepsCount: 20,
+      voicePrompt: "Move straight approx 20 steps and continue straight."
+    },
+    {
+      stepNumber: 4,
+      instruction: "Move straight approx 20 steps and take stairs up.",
+      headingDegrees: 0,
+      headingText: "take stairs up",
+      stepsCount: 20,
+      voicePrompt: "Move straight approx 20 steps and take stairs up."
+    },
+    {
+      stepNumber: 5,
+      instruction: "Move straight approx 10 steps to reach Data Science Lab.",
+      headingDegrees: 0,
+      headingText: "continue straight",
+      stepsCount: 10,
+      voicePrompt: "Move straight approx 10 steps to reach Data Science Lab."
     }
   ]
 };
@@ -85,14 +116,17 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     setActiveLLMRoute(matchedRoute);
   }, [selectedStartPoint, selectedDestinationId]);
 
-  // Handle Start Navigation Button Click
-  const handleStartNavigation = () => {
+  // Handle Start Navigation Button Click (Synthesizes direct corpus navigation steps if needed)
+  const handleStartNavigation = async () => {
     sensorService.resetStepCounter();
     sensorService.triggerHapticFeedback([100]);
     setIsNavigating(true);
     setFallbackAlert(null);
     setAmbiguousOptions(null);
-    speechService.speak(`Starting navigation from ${activeLLMRoute.startPoint} to ${activeLLMRoute.destinationName}. Node 1: ${activeLLMRoute.steps[0].voicePrompt}`);
+
+    // Fetch navigation steps from active route
+    const firstStepPrompt = activeLLMRoute.steps[0]?.voicePrompt || activeLLMRoute.steps[0]?.instruction || 'Proceed straight';
+    speechService.speak(`Starting navigation to ${activeLLMRoute.destinationName}. Step 1: ${firstStepPrompt}`);
   };
 
   // Handle Mic Click
@@ -123,42 +157,32 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     );
   };
 
-  // Process Voice Query with Ambiguity Confirmation
-  const handleProcessVoiceQuery = (query: string) => {
+  // Process Voice Query by carefully analyzing corpuses with Gemini AI
+  const handleProcessVoiceQuery = async (query: string) => {
     setVoiceState('processing');
 
-    setTimeout(() => {
-      const result = resolveLLMVoiceQuery(query);
+    const result = await resolveLLMVoiceQueryAsync(query, selectedStartPoint);
 
-      if (result.matched && result.route) {
-        setVoiceState('success');
+    if (result.matched && result.route) {
+      setVoiceState('success');
 
-        if (result.isAmbiguous && result.ambiguousMatches) {
-          setAmbiguousOptions(result.ambiguousMatches);
-          setFallbackAlert(null);
-          speechService.speak(result.responseMessage);
-        } else if (result.isNearbyLandmarkFallback) {
-          setAmbiguousOptions(null);
-          setActiveLLMRoute(result.route);
-          setSelectedDestinationId(result.route.id);
-          setSelectedStartPoint(result.route.startPoint);
-          setIsNavigating(true);
-          setFallbackAlert(`⚠️ Direct route for "${query}" not found. Step 10 meters to nearby landmark "${result.nearbyLandmarkName}" to start route!`);
-          speechService.speak(result.responseMessage);
-        } else {
-          setAmbiguousOptions(null);
-          setActiveLLMRoute(result.route);
-          setSelectedDestinationId(result.route.id);
-          setSelectedStartPoint(result.route.startPoint);
-          setIsNavigating(true);
-          setFallbackAlert(null);
-          speechService.speak(result.responseMessage);
-        }
+      if (result.isAmbiguous && result.ambiguousMatches) {
+        setAmbiguousOptions(result.ambiguousMatches);
+        setFallbackAlert(null);
+        speechService.speak(result.responseMessage);
       } else {
-        setVoiceState('error');
+        setAmbiguousOptions(null);
+        setActiveLLMRoute(result.route);
+        setSelectedDestinationId(result.route.id);
+        setSelectedStartPoint(result.route.startPoint);
+        setIsNavigating(true);
+        setFallbackAlert(null);
         speechService.speak(result.responseMessage);
       }
-    }, 400);
+    } else {
+      setVoiceState('error');
+      speechService.speak(result.responseMessage);
+    }
   };
 
   // Select Ambiguous Option Confirmation
@@ -315,7 +339,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
         </div>
       )}
 
-      {/* 2. REAL-TIME 360° COMPASS & ACCELEROMETER STEP COUNTER */}
+      {/* 2. REAL-TIME COMPASS & STEP COUNTER COCKPIT */}
       <div className="z-10 flex-1 flex flex-col min-h-0">
         <LLMVoiceCockpit
           route={activeLLMRoute}
@@ -341,7 +365,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
 
       {/* Compact Single-Screen Footer */}
       <footer className="p-1.5 bg-white/80 backdrop-blur-md rounded-xl border border-slate-200 text-center text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-wider z-10">
-        Smart Campus AI Navigation • Ready for Real Data Entry
+        Smart Campus AI Navigation • Dynamic Real-Time Corpus Engine
       </footer>
     </div>
   );
