@@ -25,6 +25,9 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
   // Live maindata.md Text State
   const [mainDataMdText, setMainDataMdText] = useState<string>('');
 
+  // Live Custom Gemini API Key State
+  const [customApiKey, setCustomApiKey] = useState<string>('');
+
   // Selected Landmark per floor
   const [selectedLandmarkId, setSelectedLandmarkId] = useState<string>('landmark_floor_1_main_entrance');
 
@@ -33,10 +36,26 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
   const [synthesisResultMsg, setSynthesisResultMsg] = useState<string | null>(null);
   const [copiedDataset, setCopiedDataset] = useState<boolean>(false);
 
-  // Load live maindata.md text on mount
+  // Load live maindata.md text and custom API key on mount
   useEffect(() => {
     setMainDataMdText(loadMainDataMarkdownText());
+    try {
+      const savedKey = localStorage.getItem('GEMINI_API_KEY_CUSTOM');
+      if (savedKey) setCustomApiKey(savedKey);
+    } catch (e) {
+      console.warn('Notice reading custom API key:', e);
+    }
   }, []);
+
+  const handleSaveApiKey = () => {
+    try {
+      localStorage.setItem('GEMINI_API_KEY_CUSTOM', customApiKey.trim());
+      setSynthesisResultMsg(customApiKey.trim() ? '✅ Saved Gemini API Key to website storage!' : 'Cleared custom Gemini API Key.');
+      speechService.speak('Gemini API key updated!');
+    } catch (e) {
+      console.warn('Notice saving custom API key:', e);
+    }
+  };
 
   // Filter landmarks available for the selected floor
   const floorLandmarks: CampusLandmark[] = CAMPUS_LANDMARKS.filter(l => l.floor === selectedFloor);
@@ -312,6 +331,44 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
             <Save className="w-4 h-4" />
             <span>Append Entry: "{activeLandmark.name} to {destinationInput || 'Destination'} - Path" ➔</span>
           </button>
+        </div>
+
+        {/* 3.5. LIVE GEMINI AI API KEY CONFIGURATION */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <Database className="w-4 h-4 text-emerald-400" />
+              Live Gemini AI API Key (Saved in Browser Storage):
+            </span>
+            <button
+              onClick={handleSaveApiKey}
+              className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center gap-1 active:scale-95 transition-all"
+            >
+              <Save className="w-3 h-3" />
+              <span>Save Key</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="password"
+              value={customApiKey}
+              onChange={(e) => setCustomApiKey(e.target.value)}
+              placeholder="Paste your Google Gemini AI API key here (AIzaSy...)"
+              className="flex-1 p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-mono text-emerald-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            />
+            {customApiKey && (
+              <button
+                onClick={() => { setCustomApiKey(''); localStorage.removeItem('GEMINI_API_KEY_CUSTOM'); setSynthesisResultMsg('Cleared API key.'); }}
+                className="px-2.5 py-2.5 rounded-xl bg-rose-900/60 hover:bg-rose-800 text-rose-200 text-xs font-bold"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-400 font-medium">
+            💡 Enables live Gemini AI API intent reasoning directly on GitHub Pages! Your key stays saved in your own browser's <code className="text-emerald-400">localStorage</code>.
+          </p>
         </div>
 
         {/* 4. LIVE maindata.md TEXT AREA EDITOR ON WEBSITE */}

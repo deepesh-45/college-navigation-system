@@ -20,9 +20,16 @@ export interface ExtractedDestinationValidationResult {
 }
 
 export const getGeminiApiKeys = (): { primary: string; fallback: string } => {
+  let customKey = '';
+  try {
+    customKey = localStorage.getItem('GEMINI_API_KEY_CUSTOM') || '';
+  } catch (e) {
+    console.warn('Notice reading GEMINI_API_KEY_CUSTOM:', e);
+  }
+
   const metaEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
   return {
-    primary: metaEnv?.VITE_GEMINI_API_KEY || '',
+    primary: customKey || metaEnv?.VITE_GEMINI_API_KEY || '',
     fallback: metaEnv?.VITE_GEMINI_API_KEY_FALLBACK || ''
   };
 };
