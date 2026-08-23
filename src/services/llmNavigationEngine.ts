@@ -15,7 +15,7 @@ export interface LLMNavigationResult {
 
 export const resolveLLMVoiceQueryAsync = async (
   query: string,
-  customStartName?: string
+  customStartName: string = 'Main Entrance'
 ): Promise<LLMNavigationResult> => {
   const normalized = query.toLowerCase().trim();
 
@@ -28,7 +28,7 @@ export const resolveLLMVoiceQueryAsync = async (
   }
 
   // 1. Try Graph Shortest Path Permutation Engine
-  const startNode = CAMPUS_NODES.length > 0 ? (findNodeByIdOrAlias(customStartName || 'main entrance') || CAMPUS_NODES[0]) : null;
+  const startNode = CAMPUS_NODES.length > 0 ? (findNodeByIdOrAlias(customStartName) || CAMPUS_NODES[0]) : null;
   const destNode = findNodeByIdOrAlias(query);
 
   if (startNode && destNode && startNode.id !== destNode.id) {
@@ -44,15 +44,16 @@ export const resolveLLMVoiceQueryAsync = async (
     }
   }
 
-  // 2. Search static LLM routes for exact or category matches
+  // 2. Search static LLM routes for exact or category matches starting at customStartName
   const matchingRoutes: LLMRouteKnowledge[] = [];
 
   for (const route of LLM_ROUTES_KNOWLEDGE) {
+    const isStartMatch = !customStartName || route.startPoint.toLowerCase().includes(customStartName.toLowerCase());
     const isNameMatch = route.destinationName.toLowerCase().includes(normalized);
     const isCategoryMatch = route.category.toLowerCase().includes(normalized);
     const isAliasMatch = route.aliases.some(a => a.toLowerCase().includes(normalized) || normalized.includes(a.toLowerCase()));
 
-    if (isNameMatch || isCategoryMatch || isAliasMatch) {
+    if (isStartMatch && (isNameMatch || isCategoryMatch || isAliasMatch)) {
       if (!matchingRoutes.some(r => r.id === route.id)) {
         matchingRoutes.push(route);
       }
@@ -79,12 +80,12 @@ export const resolveLLMVoiceQueryAsync = async (
       isAmbiguous: false,
       isNearbyLandmarkFallback: false,
       route,
-      responseMessage: `Found route to ${route.destinationName}! ${route.overviewSummary}`
+      responseMessage: `Found route from ${route.startPoint} to ${route.destinationName}! ${route.overviewSummary}`
     };
   }
 
-  // 3. Dynamic Real-Time Gemini AI Direct Corpus Navigation Generation!
-  const corpusSynthesizedRoute = await generateRouteDirectlyFromCorpus(query);
+  // 3. Dynamic Real-Time Gemini AI Direct Corpus Navigation (Start Point -> Destination)
+  const corpusSynthesizedRoute = await generateRouteDirectlyFromCorpus(query, customStartName);
   if (corpusSynthesizedRoute) {
     // Cache synthesized route into memory
     LLM_ROUTES_KNOWLEDGE.push(corpusSynthesizedRoute);
@@ -93,7 +94,7 @@ export const resolveLLMVoiceQueryAsync = async (
       isAmbiguous: false,
       isNearbyLandmarkFallback: false,
       route: corpusSynthesizedRoute,
-      responseMessage: `Synthesized step-by-step route to ${corpusSynthesizedRoute.destinationName} directly from campus corpus! Total ${corpusSynthesizedRoute.totalSteps} steps.`
+      responseMessage: `Synthesized route from ${corpusSynthesizedRoute.startPoint} to ${corpusSynthesizedRoute.destinationName} directly from campus corpuses! Total ${corpusSynthesizedRoute.totalSteps} steps.`
     };
   }
 
@@ -103,16 +104,16 @@ export const resolveLLMVoiceQueryAsync = async (
     matched: fallbackRoute !== null,
     isAmbiguous: false,
     isNearbyLandmarkFallback: true,
-    nearbyLandmarkName: fallbackRoute ? fallbackRoute.startPoint : "Campus Main Entrance",
+    nearbyLandmarkName: customStartName || "Main Entrance",
     route: fallbackRoute,
-    responseMessage: `⚠️ Could not extract route for "${query}". Redirecting to Main Entrance.`
+    responseMessage: `⚠️ Could not extract route from ${customStartName} to "${query}".`
   };
 };
 
 // Synchronous wrapper for backward compatibility
-export const resolveLLMVoiceQuery = (query: string, customStartName?: string): LLMNavigationResult => {
+export const resolveLLMVoiceQuery = (query: string, customStartName: string = 'Main Entrance'): LLMNavigationResult => {
   const normalized = query.toLowerCase().trim();
-  const startNode = CAMPUS_NODES.length > 0 ? (findNodeByIdOrAlias(customStartName || 'main entrance') || CAMPUS_NODES[0]) : null;
+  const startNode = CAMPUS_NODES.length > 0 ? (findNodeByIdOrAlias(customStartName) || CAMPUS_NODES[0]) : null;
   const destNode = findNodeByIdOrAlias(query);
 
   if (startNode && destNode && startNode.id !== destNode.id) {

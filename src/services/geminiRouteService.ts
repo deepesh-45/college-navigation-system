@@ -9,15 +9,16 @@ export const getGeminiApiKeys = (): { primary: string; fallback: string } => {
   };
 };
 
-// Generate Step-by-Step Navigation Directly from Raw Spoken Corpuses with Gemini AI
+// Generate Step-by-Step Navigation Directly from Raw Spoken Corpuses (User Start Point -> Destination)
 export const generateRouteDirectlyFromCorpus = async (
-  destinationQuery: string
+  destinationQuery: string,
+  startPoint: string = 'Main Entrance'
 ): Promise<LLMRouteKnowledge | null> => {
   const { primary, fallback } = getGeminiApiKeys();
   const apiKeysToTry = [primary, fallback].filter(k => k && !k.includes('DemoApiKey'));
 
   const systemPrompt = `You are a Smart Campus Navigation AI Engine.
-Analyze the following raw spoken campus walk corpuses and generate a step-by-step navigation route from Main Entrance to the requested destination: "${destinationQuery}".
+Analyze the following raw spoken campus walk corpuses and generate a step-by-step navigation route from the starting location "${startPoint}" to the requested destination "${destinationQuery}".
 
 RAW CAMPUS CORPUSES:
 [GROUND FLOOR (FLOOR 1)]:
@@ -27,24 +28,26 @@ ${GROUND_FLOOR_CORPUS}
 ${FIRST_FLOOR_CORPUS}
 
 RULES:
-1. Carefully analyze the corpuses to extract the required number of steps, directional turns (turn left, turn right, continue straight), and floor transitions via stairs/elevators.
-2. Format EVERY step instruction strictly as:
+1. Carefully analyze the corpuses to locate the starting point "${startPoint}" and destination "${destinationQuery}".
+2. Extract the required number of steps, directional turns (turn left, turn right, continue straight), and floor transitions via stairs/elevators between "${startPoint}" and "${destinationQuery}".
+3. Format EVERY step instruction strictly as:
    "Move straight approx [N] steps and [turn left / turn right / continue straight / take stairs up / take stairs down / reach destination]."
-3. Calculate totalSteps by summing stepsCount across all steps.
-4. Calculate totalDistanceMeters as Math.round(totalSteps * 0.75).
-5. Return strictly raw valid JSON (no markdown formatting around json) conforming to this structure:
+4. Calculate totalSteps by summing stepsCount across all steps.
+5. Calculate totalDistanceMeters as Math.round(totalSteps * 0.75).
+6. Set startPoint to "${startPoint}" and destinationName to "${destinationQuery}".
+7. Return strictly raw valid JSON (no markdown formatting around json) conforming to this structure:
 
 {
   "id": "ROUTE_DYNAMIC_CORPUS_${Date.now()}",
   "category": "lab|classroom|cabin|washroom|watercooler|auditorium|library|canteen|facility",
   "destinationName": "${destinationQuery}",
   "aliases": ["${destinationQuery.toLowerCase()}"],
-  "startPoint": "Main Entrance",
+  "startPoint": "${startPoint}",
   "building": "Main Campus",
   "floor": 1,
-  "totalSteps": 45,
-  "totalDistanceMeters": 34,
-  "overviewSummary": "Direct navigation route to ${destinationQuery} synthesized from campus corpus.",
+  "totalSteps": 35,
+  "totalDistanceMeters": 26,
+  "overviewSummary": "Direct navigation route from ${startPoint} to ${destinationQuery} synthesized from campus corpus.",
   "steps": [
     {
       "stepNumber": 1,
@@ -87,5 +90,5 @@ export const generateLLMRouteWithGemini = async (
   _compassHeading?: number,
   _stepsWalked?: number
 ): Promise<LLMRouteKnowledge | null> => {
-  return generateRouteDirectlyFromCorpus(rawDescription);
+  return generateRouteDirectlyFromCorpus(rawDescription, 'Main Entrance');
 };
