@@ -32,7 +32,7 @@ export interface GraphEdge {
   isStaircaseOrElevator?: boolean;
 }
 
-// Real Campus Graph Nodes collected from live field walk
+// Real Campus Graph Nodes collected from live field walk (Floor 1)
 export const CAMPUS_NODES: GraphNode[] = [
   {
     id: "main_entrance",
@@ -55,7 +55,7 @@ export const CAMPUS_NODES: GraphNode[] = [
     name: "Staircase Floor 2",
     aliases: ["staircase floor 2"],
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     type: "staircase"
   },
   {
@@ -63,7 +63,7 @@ export const CAMPUS_NODES: GraphNode[] = [
     name: "Elevator Floor 2",
     aliases: ["elevator floor 2"],
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     type: "elevator"
   },
   {
@@ -71,7 +71,7 @@ export const CAMPUS_NODES: GraphNode[] = [
     name: "Node 5",
     aliases: ["node 5"],
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     type: "facility"
   },
   {
@@ -79,7 +79,7 @@ export const CAMPUS_NODES: GraphNode[] = [
     name: "Data Science Lab",
     aliases: ["data science lab", "ds lab"],
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     type: "lab"
   },
   {
@@ -87,7 +87,7 @@ export const CAMPUS_NODES: GraphNode[] = [
     name: "Node 8",
     aliases: ["node 8"],
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     type: "facility"
   },
   {
@@ -95,12 +95,12 @@ export const CAMPUS_NODES: GraphNode[] = [
     name: "Node 6",
     aliases: ["node 6"],
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     type: "facility"
   }
 ];
 
-// Real Campus Graph Edges collected from live field walk
+// Real Campus Graph Edges collected from live field walk (Floor 1)
 export const CAMPUS_EDGES: GraphEdge[] = [
   {
     id: "edge_main_entrance_to_hallway_junction",

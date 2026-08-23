@@ -33,7 +33,7 @@ export interface LLMRouteKnowledge {
   steps: LLMStepInstruction[];
 }
 
-// Real Campus LLM Route Knowledge collected from live field walk
+// Real Campus LLM Route Knowledge collected from live field walk (Floor 1)
 export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
   {
     id: "ROUTE_data_science_lab",
@@ -42,7 +42,7 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
     aliases: ["data science lab", "ds lab"],
     startPoint: "Main Entrance",
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     totalSteps: 79,
     totalDistanceMeters: 59,
     overviewSummary: "Step-by-step route from Main Entrance to Data Science Lab.",
@@ -96,7 +96,7 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
     aliases: ["node 8"],
     startPoint: "Main Entrance",
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     totalSteps: 124,
     totalDistanceMeters: 93,
     overviewSummary: "Step-by-step route from Main Entrance to Node 8.",
@@ -174,7 +174,7 @@ export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [
     aliases: ["node 6"],
     startPoint: "Main Entrance",
     building: "Main Campus",
-    floor: 2,
+    floor: 1,
     totalSteps: 94,
     totalDistanceMeters: 71,
     overviewSummary: "Step-by-step route from Main Entrance to Node 6.",
