@@ -4,6 +4,7 @@ import { LLM_ROUTES_KNOWLEDGE, saveLLMRoutesToStorage } from '../data/llmRoutesK
 import { CAMPUS_NODES, CAMPUS_EDGES, saveCampusGraphToStorage } from '../data/campusGraphData';
 import { synthesizeCampusCorpusWithGemini } from '../services/geminiCorpusSynthesizer';
 import { speechService } from '../services/speechService';
+import { GROUND_FLOOR_CORPUS, FIRST_FLOOR_CORPUS } from '../data/corpuses';
 
 interface AdminPortalViewProps {
   onClose: () => void;
@@ -14,8 +15,8 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose }) => 
   const [floors, setFloors] = useState<number[]>([1, 2]);
   const [selectedFloor, setSelectedFloor] = useState<number>(1);
   const [floorCorpusMap, setFloorCorpusMap] = useState<Record<number, string>>({
-    1: 'Start from main entrance of building. Go 10 steps straight you will find a junction. We will turn left and walk 30 steps to get stairs. Climb stairs upward to second floor.',
-    2: 'Arrived at second floor via stairs. Walk 10 steps ahead to reach Data Science Lab. Turn left and walk 20 steps to reach AI Research Center.'
+    1: GROUND_FLOOR_CORPUS.trim(),
+    2: FIRST_FLOOR_CORPUS.trim()
   });
 
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -76,10 +77,10 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose }) => 
     setFloorCorpusMap(prev => ({ ...prev, [nextFloor]: '' }));
   };
 
-  // Synthesize Corpus for All Floors with Gemini AI & Save Automatically to Device Storage
+  // Synthesize Corpus for All Floors directly with Gemini AI & Save Automatically
   const handleSynthesizeAllFloorsWithGemini = async () => {
     const combinedCorpus = Object.entries(floorCorpusMap)
-      .map(([floor, corpus]) => `[FLOOR ${floor} CORPUS]: ${corpus}`)
+      .map(([floor, corpus]) => `[${floor === '1' ? 'GROUND FLOOR' : floor === '2' ? 'FIRST FLOOR' : 'FLOOR ' + floor} CORPUS]: ${corpus}`)
       .join('\n\n');
 
     if (!combinedCorpus.trim()) return;
@@ -113,7 +114,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose }) => 
 
     setIsSynthesizing(false);
     setSynthesisResultMsg(result.summaryText + ' 💾 Saved automatically to your device!');
-    speechService.speak('Floor-wise dataset synthesized and saved automatically to your device!');
+    speechService.speak('Floor-wise dataset synthesized directly from raw corpuses and saved!');
   };
 
   const generateExportCode = () => {
@@ -153,8 +154,8 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
       LLM_ROUTES_KNOWLEDGE.length = 0;
       saveCampusGraphToStorage();
       saveLLMRoutesToStorage();
-      setFloorCorpusMap({ 1: '' });
-      setSynthesisResultMsg('All datasets cleared! Ready for new floor-wise recordings.');
+      setFloorCorpusMap({ 1: GROUND_FLOOR_CORPUS.trim(), 2: FIRST_FLOOR_CORPUS.trim() });
+      setSynthesisResultMsg('All datasets reset to default floor corpuses.');
     }
   };
 
@@ -169,10 +170,10 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
           </div>
           <div>
             <h2 className="font-l2 text-base sm:text-lg font-black text-white leading-none">
-              Admin Portal — Floor-Wise Voice Corpus Synthesizer
+              Admin Portal — Direct Floor Corpus Navigation Synthesizer
             </h2>
             <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-              Record spoken routes per floor & extract spatial graph JSON with Gemini AI
+              Ground Floor (Floor 1) & First Floor (Floor 2) Raw Spoken Corpuses
             </p>
           </div>
         </div>
@@ -193,7 +194,7 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase text-slate-400 flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-blue-500" />
-              Select Active Building Floor:
+              Select Active Building Floor Corpus:
             </span>
             <button
               onClick={handleAddFloor}
@@ -216,7 +217,7 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
                 }`}
               >
-                Floor {f} {f === 0 ? '(Ground Floor)' : f === 1 ? '(1st Floor)' : f === 2 ? '(2nd Floor)' : ''}
+                {f === 1 ? 'Ground Floor (Floor 1)' : f === 2 ? 'First Floor (Floor 2)' : `Floor ${f}`}
               </button>
             ))}
           </div>
@@ -227,7 +228,7 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
               <Mic className="w-4 h-4 text-blue-500" />
-              Floor {selectedFloor} Voice Audio Recorder
+              {selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : `Floor ${selectedFloor}`} Voice Audio Recorder
             </span>
             {isRecording && (
               <span className="text-xs font-black text-rose-400 animate-pulse flex items-center gap-1">
@@ -246,13 +247,13 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
               }`}
             >
               {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              <span>{isRecording ? 'Stop Recording' : `🎙️ Record Voice for Floor ${selectedFloor}`}</span>
+              <span>{isRecording ? 'Stop Recording' : `🎙️ Record Voice for ${selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : 'Floor ' + selectedFloor}`}</span>
             </button>
 
             <button
               onClick={handleClearAll}
               className="p-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold active:scale-95 transition-all"
-              title="Clear Corpus & Dataset"
+              title="Reset to Default Corpuses"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -264,27 +265,27 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
           <label className="text-xs font-black uppercase text-slate-300 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-blue-500" />
-              Floor {selectedFloor} Spoken Walk Corpus:
+              {selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : `Floor ${selectedFloor}`} Spoken Corpus Text:
             </span>
-            <span className="text-[10px] font-semibold text-slate-400">Editable Transcript</span>
+            <span className="text-[10px] font-semibold text-slate-400">Editable Raw Corpus</span>
           </label>
           <textarea
-            rows={5}
+            rows={6}
             value={floorCorpusMap[selectedFloor] || ''}
             onChange={(e) => setFloorCorpusMap({ ...floorCorpusMap, [selectedFloor]: e.target.value })}
-            placeholder={`Speak or type Floor ${selectedFloor} walk description: Start from main entrance... go 10 steps straight... turn left... take stairs up...`}
-            className="w-full p-3.5 rounded-2xl border border-slate-700 text-xs font-medium text-slate-100 bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-inner"
+            placeholder={`Speak or type ${selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : 'Floor ' + selectedFloor} walk description...`}
+            className="w-full p-3.5 rounded-2xl border border-slate-700 text-xs font-medium text-slate-100 bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-inner leading-relaxed"
           />
         </div>
 
-        {/* GEMINI AI SYNTHESIZE ALL FLOORS BUTTON */}
+        {/* GEMINI AI SYNTHESIZE DIRECTLY FROM CORPUSES BUTTON */}
         <button
           disabled={isSynthesizing}
           onClick={handleSynthesizeAllFloorsWithGemini}
           className="w-full py-4 px-5 rounded-2xl bg-brand-gradient hover:opacity-95 disabled:opacity-50 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transform active:scale-95 transition-all"
         >
           <Sparkles className="w-5 h-5 text-amber-300 animate-spin" />
-          <span>{isSynthesizing ? 'Extracting Floor-Wise Graph with Gemini AI...' : '✨ Extract Floor Graph & Routes with Gemini AI'}</span>
+          <span>{isSynthesizing ? 'Extracting Step-by-Step Navigation from Corpuses...' : '✨ Generate Direct Navigation Routes from Corpuses with Gemini AI'}</span>
         </button>
 
         {/* SYNTHESIS RESULT NOTIFICATION BANNER */}
