@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { LLMVoiceCockpit } from './LLMVoiceCockpit';
 import { AdminPortalView } from './AdminPortalView';
 import { VantaBackground } from './VantaBackground';
@@ -9,16 +9,16 @@ import { LLMRouteKnowledge, LLM_ROUTES_KNOWLEDGE } from '../data/llmRoutesKnowle
 import { VoiceState } from '../types';
 import { sensorService } from '../services/sensorService';
 
-import { Mic, MicOff, Navigation, Key, ArrowLeft, MapPin, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Mic, MicOff, Navigation, Key, ArrowLeft, MapPin, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
 
 interface MobileNavigationViewProps {
   userRole: string;
   onBackToGreeting: () => void;
 }
 
-const EMPTY_STARTER_ROUTE: LLMRouteKnowledge = {
-  id: "STARTER_EMPTY_ROUTE",
-  category: "facility",
+const DEFAULT_STARTER_ROUTE: LLMRouteKnowledge = {
+  id: "STARTER_DEFAULT_ROUTE",
+  category: "lab",
   destinationName: "Data Science Lab",
   aliases: ["data science lab", "ds lab"],
   startPoint: "Main Entrance",
@@ -74,15 +74,16 @@ const EMPTY_STARTER_ROUTE: LLMRouteKnowledge = {
 export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   onBackToGreeting
 }) => {
-  const initialRoute = LLM_ROUTES_KNOWLEDGE.length > 0 ? LLM_ROUTES_KNOWLEDGE[0] : EMPTY_STARTER_ROUTE;
+  const initialRoute = LLM_ROUTES_KNOWLEDGE.length > 0 ? LLM_ROUTES_KNOWLEDGE[0] : DEFAULT_STARTER_ROUTE;
 
-  // Dual Input Boxes State
-  const [selectedStartPoint, setSelectedStartPoint] = useState<string>(initialRoute.startPoint);
-  const [selectedDestinationId, setSelectedDestinationId] = useState<string>(initialRoute.id);
+  // Type-Based Input Text Fields (Not locked dropdown selection)
+  const [startPointInput, setStartPointInput] = useState<string>(initialRoute.startPoint);
+  const [destinationInput, setDestinationInput] = useState<string>(initialRoute.destinationName);
 
   // Active Navigation State
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
   const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge>(initialRoute);
+  const [isLoadingRoute, setIsLoadingRoute] = useState<boolean>(false);
 
   // Voice & Ambiguity State
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
@@ -93,40 +94,29 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   // Admin Portal Modal
   const [showAdminPortal, setShowAdminPortal] = useState<boolean>(false);
 
-  // Available unique start points
-  const startPoints = LLM_ROUTES_KNOWLEDGE.length > 0 
-    ? Array.from(new Set(LLM_ROUTES_KNOWLEDGE.map(r => r.startPoint))) 
-    : [EMPTY_STARTER_ROUTE.startPoint];
-
-  // Sync route selection when dropdown inputs change
-  useEffect(() => {
-    if (LLM_ROUTES_KNOWLEDGE.length === 0) {
-      setActiveLLMRoute(EMPTY_STARTER_ROUTE);
-      return;
-    }
-
-    const matchedRoute = LLM_ROUTES_KNOWLEDGE.find(
-      r => r.id === selectedDestinationId && r.startPoint === selectedStartPoint
-    ) || LLM_ROUTES_KNOWLEDGE.find(r => r.id === selectedDestinationId) || LLM_ROUTES_KNOWLEDGE[0];
-
-    if (matchedRoute.startPoint !== selectedStartPoint) {
-      setSelectedStartPoint(matchedRoute.startPoint);
-    }
-
-    setActiveLLMRoute(matchedRoute);
-  }, [selectedStartPoint, selectedDestinationId]);
-
-  // Handle Start Navigation Button Click (Synthesizes direct corpus navigation steps if needed)
+  // Handle Start Navigation Button Click (Fetches direct corpus steps between type-based Start Point & Destination)
   const handleStartNavigation = async () => {
+    if (!destinationInput.trim()) return;
+
     sensorService.resetStepCounter();
     sensorService.triggerHapticFeedback([100]);
-    setIsNavigating(true);
+    setIsLoadingRoute(true);
     setFallbackAlert(null);
     setAmbiguousOptions(null);
 
-    // Fetch navigation steps from active route
-    const firstStepPrompt = activeLLMRoute.steps[0]?.voicePrompt || activeLLMRoute.steps[0]?.instruction || 'Proceed straight';
-    speechService.speak(`Starting navigation to ${activeLLMRoute.destinationName}. Step 1: ${firstStepPrompt}`);
+    const result = await resolveLLMVoiceQueryAsync(destinationInput, startPointInput);
+
+    setIsLoadingRoute(false);
+
+    if (result.matched && result.route) {
+      setActiveLLMRoute(result.route);
+      setIsNavigating(true);
+      const firstStepPrompt = result.route.steps[0]?.voicePrompt || result.route.steps[0]?.instruction || 'Proceed straight';
+      speechService.speak(`Starting navigation from ${result.route.startPoint} to ${result.route.destinationName}. Step 1: ${firstStepPrompt}`);
+    } else {
+      setIsNavigating(true);
+      speechService.speak(`Starting navigation to ${destinationInput}.`);
+    }
   };
 
   // Handle Mic Click
@@ -157,11 +147,18 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     );
   };
 
-  // Process Voice Query by carefully analyzing corpuses with Gemini AI
+  // Process Voice Query: Gemini API decodes startPoint and destination, updates text inputs, and starts navigation
   const handleProcessVoiceQuery = async (query: string) => {
     setVoiceState('processing');
+    setIsLoadingRoute(true);
 
-    const result = await resolveLLMVoiceQueryAsync(query, selectedStartPoint);
+    const result = await resolveLLMVoiceQueryAsync(query);
+    setIsLoadingRoute(false);
+
+    if (result.parsedIntent) {
+      setStartPointInput(result.parsedIntent.startPoint);
+      setDestinationInput(result.parsedIntent.destination);
+    }
 
     if (result.matched && result.route) {
       setVoiceState('success');
@@ -173,8 +170,6 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
       } else {
         setAmbiguousOptions(null);
         setActiveLLMRoute(result.route);
-        setSelectedDestinationId(result.route.id);
-        setSelectedStartPoint(result.route.startPoint);
         setIsNavigating(true);
         setFallbackAlert(null);
         speechService.speak(result.responseMessage);
@@ -189,8 +184,8 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   const handleConfirmAmbiguousSelection = (route: LLMRouteKnowledge) => {
     setAmbiguousOptions(null);
     setActiveLLMRoute(route);
-    setSelectedDestinationId(route.id);
-    setSelectedStartPoint(route.startPoint);
+    setStartPointInput(route.startPoint);
+    setDestinationInput(route.destinationName);
     setIsNavigating(true);
     speechService.speak(`Confirmed selection for ${route.destinationName}. Starting navigation now.`);
   };
@@ -224,55 +219,41 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
         </button>
       </div>
 
-      {/* 1. START PAGE DIRECTLY WITH START LOCATION & DESTINATION INPUTS */}
+      {/* 1. TYPE-BASED INPUT FIELDS (START LOCATION & DESTINATION) */}
       <div className="p-2.5 sm:p-3 rounded-2xl bg-white border border-slate-200 shadow space-y-2 z-10">
         <div className="grid grid-cols-2 gap-2">
-          {/* Start Point Input */}
+          {/* Start Point Type-Based Text Input */}
           <div>
             <label className="text-[9px] font-extrabold uppercase text-slate-500 block mb-0.5 truncate">
               Start Location:
             </label>
-            <select
-              value={selectedStartPoint}
+            <input
+              type="text"
+              value={startPointInput}
               onChange={(e) => {
-                setSelectedStartPoint(e.target.value);
+                setStartPointInput(e.target.value);
                 setIsNavigating(false);
               }}
+              placeholder="e.g. Main Entrance, Hallway Junction"
               className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8] truncate"
-            >
-              {startPoints.map((sp, idx) => (
-                <option key={idx} value={sp}>
-                  📍 {sp}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
-          {/* Destination Input */}
+          {/* Destination Type-Based Text Input */}
           <div>
             <label className="text-[9px] font-extrabold uppercase text-slate-500 block mb-0.5 truncate">
               Destination:
             </label>
-            <select
-              value={selectedDestinationId}
+            <input
+              type="text"
+              value={destinationInput}
               onChange={(e) => {
-                setSelectedDestinationId(e.target.value);
+                setDestinationInput(e.target.value);
                 setIsNavigating(false);
               }}
+              placeholder="e.g. Data Science Lab, Washroom"
               className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8] truncate"
-            >
-              {LLM_ROUTES_KNOWLEDGE.length > 0 ? (
-                LLM_ROUTES_KNOWLEDGE.map(r => (
-                  <option key={r.id} value={r.id}>
-                    🎯 {r.destinationName}
-                  </option>
-                ))
-              ) : (
-                <option value={EMPTY_STARTER_ROUTE.id}>
-                  🎯 Add Routes via Admin Panel
-                </option>
-              )}
-            </select>
+            />
           </div>
         </div>
 
@@ -299,11 +280,16 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
           </button>
 
           <button
+            disabled={isLoadingRoute}
             onClick={handleStartNavigation}
-            className="flex-1 py-2 px-3 rounded-xl bg-brand-gradient hover:opacity-95 text-white font-black text-[11px] uppercase tracking-wider shadow flex items-center justify-center gap-1.5 transform active:scale-95 transition-all"
+            className="flex-1 py-2 px-3 rounded-xl bg-brand-gradient hover:opacity-95 text-white font-black text-[11px] uppercase tracking-wider shadow flex items-center justify-center gap-1.5 transform active:scale-95 transition-all disabled:opacity-50"
           >
-            <Navigation className="w-3.5 h-3.5" />
-            <span>Start Navigation ➔</span>
+            {isLoadingRoute ? (
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+            ) : (
+              <Navigation className="w-3.5 h-3.5" />
+            )}
+            <span>{isLoadingRoute ? 'Synthesizing...' : 'Start Navigation ➔'}</span>
           </button>
         </div>
       </div>
@@ -356,8 +342,8 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
           onClose={() => setShowAdminPortal(false)}
           onRouteAdded={(newRoute) => {
             setActiveLLMRoute(newRoute);
-            setSelectedDestinationId(newRoute.id);
-            setSelectedStartPoint(newRoute.startPoint);
+            setStartPointInput(newRoute.startPoint);
+            setDestinationInput(newRoute.destinationName);
             setIsNavigating(true);
           }}
         />
@@ -365,7 +351,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
 
       {/* Compact Single-Screen Footer */}
       <footer className="p-1.5 bg-white/80 backdrop-blur-md rounded-xl border border-slate-200 text-center text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-wider z-10">
-        Smart Campus AI Navigation • Dynamic Real-Time Corpus Engine
+        Smart Campus AI Navigation • Gemini AI Intent Parser & Corpus Engine
       </footer>
     </div>
   );

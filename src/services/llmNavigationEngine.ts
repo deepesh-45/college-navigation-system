@@ -1,7 +1,7 @@
 import { LLM_ROUTES_KNOWLEDGE, LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
 import { CAMPUS_NODES } from '../data/campusGraphData';
 import { findNodeByIdOrAlias, generateRoutePermutationFromGraph } from './graphRouteEngine';
-import { generateRouteDirectlyFromCorpus } from './geminiRouteService';
+import { generateRouteDirectlyFromCorpus, parseVoiceIntentWithGemini, ParsedVoiceIntent } from './geminiRouteService';
 
 export interface LLMNavigationResult {
   matched: boolean;
@@ -9,13 +9,14 @@ export interface LLMNavigationResult {
   ambiguousMatches?: LLMRouteKnowledge[];
   isNearbyLandmarkFallback?: boolean;
   nearbyLandmarkName?: string;
+  parsedIntent?: ParsedVoiceIntent;
   route: LLMRouteKnowledge | null;
   responseMessage: string;
 }
 
 export const resolveLLMVoiceQueryAsync = async (
   query: string,
-  customStartName: string = 'Main Entrance'
+  explicitStartPoint?: string
 ): Promise<LLMNavigationResult> => {
   const normalized = query.toLowerCase().trim();
 
@@ -23,13 +24,18 @@ export const resolveLLMVoiceQueryAsync = async (
     return {
       matched: false,
       route: null,
-      responseMessage: "I didn't catch that. Please speak your destination, like 'Where is the washroom?' or 'Take me to the Data Science Lab'."
+      responseMessage: "I didn't catch that. Please speak your starting location and destination, e.g. 'I am at Main Entrance, take me to Data Science Lab'."
     };
   }
 
-  // 1. Try Graph Shortest Path Permutation Engine
-  const startNode = CAMPUS_NODES.length > 0 ? (findNodeByIdOrAlias(customStartName) || CAMPUS_NODES[0]) : null;
-  const destNode = findNodeByIdOrAlias(query);
+  // 1. Decode Voice Intent to extract Start Point and Destination via Gemini API
+  const parsedIntent = await parseVoiceIntentWithGemini(query);
+  const startPoint = explicitStartPoint || parsedIntent.startPoint || 'Main Entrance';
+  const destination = parsedIntent.destination || query;
+
+  // 2. Try Graph Shortest Path Engine
+  const startNode = CAMPUS_NODES.length > 0 ? (findNodeByIdOrAlias(startPoint) || CAMPUS_NODES[0]) : null;
+  const destNode = findNodeByIdOrAlias(destination);
 
   if (startNode && destNode && startNode.id !== destNode.id) {
     const graphRoute = generateRoutePermutationFromGraph(startNode, destNode);
@@ -38,63 +44,24 @@ export const resolveLLMVoiceQueryAsync = async (
         matched: true,
         isAmbiguous: false,
         isNearbyLandmarkFallback: false,
+        parsedIntent: { startPoint, destination },
         route: graphRoute,
-        responseMessage: `Generated optimal route from ${startNode.name} to ${destNode.name}! Total ${graphRoute.totalSteps} steps (${graphRoute.totalDistanceMeters}m walk).`
+        responseMessage: `Generated route from ${startPoint} to ${destNode.name}! Total ${graphRoute.totalSteps} steps.`
       };
     }
   }
 
-  // 2. Search static LLM routes for exact or category matches starting at customStartName
-  const matchingRoutes: LLMRouteKnowledge[] = [];
-
-  for (const route of LLM_ROUTES_KNOWLEDGE) {
-    const isStartMatch = !customStartName || route.startPoint.toLowerCase().includes(customStartName.toLowerCase());
-    const isNameMatch = route.destinationName.toLowerCase().includes(normalized);
-    const isCategoryMatch = route.category.toLowerCase().includes(normalized);
-    const isAliasMatch = route.aliases.some(a => a.toLowerCase().includes(normalized) || normalized.includes(a.toLowerCase()));
-
-    if (isStartMatch && (isNameMatch || isCategoryMatch || isAliasMatch)) {
-      if (!matchingRoutes.some(r => r.id === route.id)) {
-        matchingRoutes.push(route);
-      }
-    }
-  }
-
-  // Ambiguity Detection
-  if (matchingRoutes.length > 1) {
-    const destinationNames = matchingRoutes.map(r => r.destinationName).join(' OR ');
-    return {
-      matched: true,
-      isAmbiguous: true,
-      ambiguousMatches: matchingRoutes,
-      route: matchingRoutes[0],
-      responseMessage: `⚠️ Ambiguous Destination: Multiple locations match "${query}". Did you mean ${destinationNames}? Please select below or speak your exact choice.`
-    };
-  }
-
-  // Single Direct Match
-  if (matchingRoutes.length === 1) {
-    const route = matchingRoutes[0];
-    return {
-      matched: true,
-      isAmbiguous: false,
-      isNearbyLandmarkFallback: false,
-      route,
-      responseMessage: `Found route from ${route.startPoint} to ${route.destinationName}! ${route.overviewSummary}`
-    };
-  }
-
-  // 3. Dynamic Real-Time Gemini AI Direct Corpus Navigation (Start Point -> Destination)
-  const corpusSynthesizedRoute = await generateRouteDirectlyFromCorpus(query, customStartName);
+  // 3. Dynamic Real-Time Gemini AI Direct Corpus Navigation (Decoded Start Point -> Destination)
+  const corpusSynthesizedRoute = await generateRouteDirectlyFromCorpus(destination, startPoint);
   if (corpusSynthesizedRoute) {
-    // Cache synthesized route into memory
     LLM_ROUTES_KNOWLEDGE.push(corpusSynthesizedRoute);
     return {
       matched: true,
       isAmbiguous: false,
       isNearbyLandmarkFallback: false,
+      parsedIntent: { startPoint, destination },
       route: corpusSynthesizedRoute,
-      responseMessage: `Synthesized route from ${corpusSynthesizedRoute.startPoint} to ${corpusSynthesizedRoute.destinationName} directly from campus corpuses! Total ${corpusSynthesizedRoute.totalSteps} steps.`
+      responseMessage: `Synthesized navigation from ${startPoint} to ${corpusSynthesizedRoute.destinationName} directly from campus corpus! Total ${corpusSynthesizedRoute.totalSteps} steps.`
     };
   }
 
@@ -104,9 +71,10 @@ export const resolveLLMVoiceQueryAsync = async (
     matched: fallbackRoute !== null,
     isAmbiguous: false,
     isNearbyLandmarkFallback: true,
-    nearbyLandmarkName: customStartName || "Main Entrance",
+    nearbyLandmarkName: startPoint,
+    parsedIntent: { startPoint, destination },
     route: fallbackRoute,
-    responseMessage: `⚠️ Could not extract route from ${customStartName} to "${query}".`
+    responseMessage: `⚠️ Could not extract route from ${startPoint} to "${destination}".`
   };
 };
 
