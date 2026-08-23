@@ -162,7 +162,11 @@ export const parseMainDataMarkdown = (mdText: string): MainDataRoute[] => {
     const destinationRaw = headerSplit[1].trim();
 
     // Extract aliases if destination is separated by 'or' or 'and'
-    const aliases = destinationRaw.split(/\s+(?:or|and)\s+/i).map(a => a.trim()).filter(Boolean);
+    const aliases = destinationRaw
+      .split(/\s+(?:or|and)\s+/i)
+      .map(a => a.trim())
+      .filter(a => a && a.toLowerCase() !== 'room' && a.toLowerCase() !== 'floor');
+      
     const primaryDestination = aliases[0] || destinationRaw;
 
     const landmarkObj = findLandmarkByNameOrAlias(startLandmark);
@@ -210,7 +214,7 @@ const extractNumbersFromString = (str: string): number[] => {
   return matches ? matches.map(m => parseInt(m, 10)) : [];
 };
 
-// INTENT & NUMERIC KEYWORD SEARCH IN MAINDATA.MD (100% Faithful Line Selection)
+// INTENT & NUMERIC KEYWORD SEARCH IN MAINDATA.MD (100% Faithful & Precision Targeted Line Selection)
 export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: string): MainDataRoute | null => {
   const mdText = loadMainDataMarkdownText();
   const routes = parseMainDataMarkdown(mdText);
@@ -220,6 +224,23 @@ export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: str
   const qNums = extractNumbersFromString(query);
   if (!qNorm) return null;
 
+  // Pass 1: If query has numbers (e.g. "5", "05", "10", "12"), require exact number match!
+  if (qNums.length > 0) {
+    for (const route of routes) {
+      const landmarkMatch = !startLandmark || normalizeTextForSearch(route.startLandmark).includes(normalizeTextForSearch(startLandmark)) || normalizeTextForSearch(startLandmark).includes(normalizeTextForSearch(route.startLandmark));
+      if (!landmarkMatch) continue;
+
+      const allAliases = [route.destination, ...route.aliases];
+      for (const alias of allAliases) {
+        const aNums = extractNumbersFromString(alias);
+        if (aNums.length > 0 && qNums.some(num => aNums.includes(num))) {
+          return route;
+        }
+      }
+    }
+  }
+
+  // Pass 2: Exact/Substring & Intent Keyword Match
   for (const route of routes) {
     const landmarkMatch = !startLandmark || normalizeTextForSearch(route.startLandmark).includes(normalizeTextForSearch(startLandmark)) || normalizeTextForSearch(startLandmark).includes(normalizeTextForSearch(route.startLandmark));
     if (!landmarkMatch) continue;
@@ -229,27 +250,16 @@ export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: str
     for (const alias of allAliases) {
       const aRaw = alias.toLowerCase().trim();
       const aNorm = normalizeTextForSearch(alias);
-      const aNums = extractNumbersFromString(alias);
+
+      // Ignore generic single stop-words like "room", "floor", "the" as standalone triggers
+      if (['room', 'floor', 'the', 'a', 'to'].includes(aNorm)) continue;
 
       // 1. Direct or Substring Normalized Match
-      if (aRaw === qRaw || aNorm === qNorm || aNorm.includes(qNorm) || qNorm.includes(aNorm) || aRaw.includes(qRaw) || qRaw.includes(aRaw)) {
+      if (aRaw === qRaw || aNorm === qNorm || (aNorm.length > 3 && qNorm.includes(aNorm)) || (qNorm.length > 3 && aNorm.includes(qNorm))) {
         return route;
       }
 
-      // 2. Numeric Matching (e.g. "f-05" or "room 5" matches "Room F-05")
-      if (qNums.length > 0 && aNums.length > 0) {
-        const hasNumberMatch = qNums.some(num => aNums.includes(num));
-        if (hasNumberMatch) {
-          const keywords = ['room', 'f', 'lab', 'stairs', 'floor', 'node'];
-          const qHasKeyword = keywords.some(k => qRaw.includes(k));
-          const aHasKeyword = keywords.some(k => aRaw.includes(k));
-          if (qHasKeyword || aHasKeyword || qNums.length === aNums.length) {
-            return route;
-          }
-        }
-      }
-
-      // 3. Synonym / Intent Keyword Match
+      // 2. Intent Keyword Match
       const intentSynonyms: Record<string, string[]> = {
         washroom: ['washroom', 'toilet', 'restroom', 'bathroom', 'lavatory', 'wc', 'boys washroom', 'girls washroom'],
         watercooler: ['watercooler', 'water', 'drinking water', 'cooler', 'filter'],
