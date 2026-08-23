@@ -18,6 +18,7 @@ export interface MainDataRoute {
   startLandmark: string;
   facingOrientation: string;
   destination: string;
+  aliases: string[];
   pathDescription: string;
   atomicSteps: MainDataAtomicStep[];
 }
@@ -28,7 +29,7 @@ const STORAGE_KEY_MD = 'MAIN_DATA_MD';
 export const loadMainDataMarkdownText = (): string => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY_MD);
-    if (saved !== null) {
+    if (saved !== null && saved.trim().length > 0) {
       return saved;
     }
   } catch (e) {
@@ -49,12 +50,13 @@ export const saveMainDataMarkdownText = (mdText: string) => {
 // Example output: "Move left", "Move 33 steps", "Move right", "Move 2 steps", "Destination reached"
 export const breakdownPathToAtomicSteps = (pathText: string, destination: string): MainDataAtomicStep[] => {
   const steps: MainDataAtomicStep[] = [];
-  const sentences = pathText.split(/(?<=[.!?])\s+|\n+/).filter(s => s.trim().length > 0);
+  const sentences = pathText.split(/(?<=[.!?])\s+|\s*\.\s*|\n+/).filter(s => s.trim().length > 0);
 
   let stepCounter = 1;
 
   for (const sentence of sentences) {
     const sLower = sentence.toLowerCase().trim();
+    if (!sLower) continue;
 
     // Extract step count digits
     const stepMatch = sLower.match(/(\d+)\s*steps?/);
@@ -85,7 +87,7 @@ export const breakdownPathToAtomicSteps = (pathText: string, destination: string
       headingDegrees = 0;
       headingText = 'take elevator';
       instruction = stepsCount > 0 ? `Move straight ${stepsCount} steps and take elevator` : 'Take elevator';
-    } else if (sLower.includes('destination') || sLower.includes('reach') || sLower.includes('arrived')) {
+    } else if (sLower.includes('destination') || sLower.includes('reach') || sLower.includes('arrived') || sLower.includes('infront') || sLower.includes('in front')) {
       action = 'arrive';
       headingDegrees = 0;
       headingText = 'arrive';
@@ -94,7 +96,7 @@ export const breakdownPathToAtomicSteps = (pathText: string, destination: string
       action = 'straight';
       headingDegrees = 0;
       headingText = 'straight';
-      instruction = stepsCount > 0 ? `Move ${stepsCount} steps` : `Move straight`;
+      instruction = stepsCount > 0 ? `Move straight ${stepsCount} steps` : `Move straight`;
     }
 
     steps.push({
@@ -113,12 +115,12 @@ export const breakdownPathToAtomicSteps = (pathText: string, destination: string
   if (!lastStep || lastStep.action !== 'arrive') {
     steps.push({
       stepNumber: stepCounter++,
-      instruction: `Destination reached`,
+      instruction: `Destination reached (${destination})`,
       action: 'arrive',
       stepsCount: 0,
       headingDegrees: 0,
       headingText: 'arrive',
-      voicePrompt: `Destination reached`
+      voicePrompt: `Destination reached (${destination})`
     });
   }
 
@@ -142,20 +144,25 @@ export const parseMainDataMarkdown = (mdText: string): MainDataRoute[] => {
     if (headerSplit.length < 2) continue;
 
     const startLandmark = headerSplit[0].trim();
-    const destination = headerSplit[1].trim();
+    const destinationRaw = headerSplit[1].trim();
+
+    // Extract aliases if destination is separated by ' or '
+    const aliases = destinationRaw.split(/\s+or\s+/i).map(a => a.trim()).filter(Boolean);
+    const primaryDestination = aliases[0] || destinationRaw;
 
     const landmarkObj = findLandmarkByNameOrAlias(startLandmark);
     const floor = landmarkObj ? landmarkObj.floor : (startLandmark.toLowerCase().includes('stair') ? 2 : 1);
     const facingOrientation = landmarkObj ? landmarkObj.facingOrientation : (floor === 2 ? 'Face towards the wall at the end of the staircase' : 'Face the same way as you enter through the main entrance');
 
-    const atomicSteps = breakdownPathToAtomicSteps(pathDescription, destination);
+    const atomicSteps = breakdownPathToAtomicSteps(pathDescription, primaryDestination);
 
     routes.push({
-      id: `route_${floor === 1 ? 'gf' : 'ff'}_${destination.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
+      id: `route_${floor === 1 ? 'gf' : 'ff'}_${primaryDestination.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
       floor,
       startLandmark,
       facingOrientation,
-      destination,
+      destination: primaryDestination,
+      aliases,
       pathDescription,
       atomicSteps
     });
@@ -177,20 +184,39 @@ export const appendEntryToMainDataMarkdown = (
   return updatedMd;
 };
 
-// Search stored maindata.md route at runtime
+const normalizeTextForSearch = (str: string): string => {
+  return str.toLowerCase().replace(/[^a-z0-9]/g, '');
+};
+
+// Search stored maindata.md route strictly from maindata.md
 export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: string): MainDataRoute | null => {
   const mdText = loadMainDataMarkdownText();
   const routes = parseMainDataMarkdown(mdText);
 
-  const normalized = query.toLowerCase().trim();
-  if (!normalized) return null;
+  const qRaw = query.toLowerCase().trim();
+  const qNorm = normalizeTextForSearch(query);
+  if (!qNorm) return null;
 
   for (const route of routes) {
-    const destMatch = route.destination.toLowerCase().includes(normalized) || normalized.includes(route.destination.toLowerCase());
-    const landmarkMatch = !startLandmark || route.startLandmark.toLowerCase().includes(startLandmark.toLowerCase());
+    const landmarkMatch = !startLandmark || normalizeTextForSearch(route.startLandmark).includes(normalizeTextForSearch(startLandmark)) || normalizeTextForSearch(startLandmark).includes(normalizeTextForSearch(route.startLandmark));
+    if (!landmarkMatch) continue;
 
-    if (destMatch && landmarkMatch) {
-      return route;
+    // Check primary destination and all aliases
+    const allAliases = [route.destination, ...route.aliases];
+    for (const alias of allAliases) {
+      const aRaw = alias.toLowerCase().trim();
+      const aNorm = normalizeTextForSearch(alias);
+
+      if (
+        aRaw === qRaw ||
+        aNorm === qNorm ||
+        aNorm.includes(qNorm) ||
+        qNorm.includes(aNorm) ||
+        aRaw.includes(qRaw) ||
+        qRaw.includes(aRaw)
+      ) {
+        return route;
+      }
     }
   }
 
@@ -215,7 +241,7 @@ export const convertMainDataToLLMRoute = (route: MainDataRoute): LLMRouteKnowled
     id: route.id,
     category: 'facility',
     destinationName: route.destination,
-    aliases: [route.destination.toLowerCase()],
+    aliases: route.aliases,
     startPoint: route.startLandmark,
     facingOrientation: route.facingOrientation,
     building: 'Main Campus',

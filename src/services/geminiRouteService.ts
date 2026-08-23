@@ -1,6 +1,6 @@
-import { LLMRouteKnowledge, LLMStepInstruction } from '../types';
-import { CAMPUS_LANDMARKS, findLandmarkByNameOrAlias, getAnchorLandmarkForFloor } from '../data/landmarksData';
-import { loadMainDataMarkdownText } from '../data/maindataService';
+import { LLMRouteKnowledge } from '../types';
+import { findLandmarkByNameOrAlias, getAnchorLandmarkForFloor } from '../data/landmarksData';
+import { loadMainDataMarkdownText, findMainDataRouteFromMarkdown, convertMainDataToLLMRoute } from '../data/maindataService';
 
 export interface ParsedVoiceIntent {
   startPoint: string;
@@ -86,11 +86,17 @@ Return strictly raw valid JSON (no markdown formatting around json):
   };
 };
 
-// Dedicated Gemini AI Navigation Prompt Engine (Landmark Facing Orientation Step 1 + Atomic Steps)
+// STRICT MAINDATA.MD NAVIGATION ENGINE (maindata.md is the ONLY source of path information)
 export const generateRouteDirectlyFromCorpus = async (
   destinationQuery: string,
   startPoint: string = 'Main Entrance'
 ): Promise<LLMRouteKnowledge | null> => {
+  // 1. Search maindata.md FIRST
+  const savedMainRoute = findMainDataRouteFromMarkdown(destinationQuery, startPoint);
+  if (savedMainRoute) {
+    return convertMainDataToLLMRoute(savedMainRoute);
+  }
+
   const { primary, fallback } = getGeminiApiKeys();
   const apiKeysToTry = [primary, fallback].filter(k => k && !k.includes('DemoApiKey'));
 
@@ -99,7 +105,7 @@ export const generateRouteDirectlyFromCorpus = async (
   const mainDataMdText = loadMainDataMarkdownText();
 
   const systemPrompt = `You are the Master Smart Campus AI Navigation Engine.
-Analyze maindata.md landmark routes and generate a step-by-step navigation route from "${matchedLandmark.name}" to "${destinationQuery}".
+Extract the route matching Starting Landmark "${matchedLandmark.name}" and Destination "${destinationQuery}" STRICTLY from maindata.md.
 
 STARTING LANDMARK ORIENTATION INSTRUCTION:
 "${facingOrientation}"
@@ -107,10 +113,11 @@ STARTING LANDMARK ORIENTATION INSTRUCTION:
 LIVE MAINDATA.MD LANDMARK ROUTES:
 ${mainDataMdText}
 
-CRITICAL SIMPLE ATOMIC STEP DECOMPOSITION RULES:
-1. Step 1 MUST be the Landmark Facing Orientation Instruction:
+CRITICAL RULES:
+1. Use ONLY the paths defined in maindata.md. If the destination "${destinationQuery}" is NOT present in maindata.md, return JSON {"error": "Path not found in maindata.md"}.
+2. Step 1 MUST be the Landmark Facing Orientation Instruction:
    "instruction": "${facingOrientation}"
-2. Subsequent steps MUST be simple single actions (ONE action per step):
+3. Subsequent steps MUST be simple single actions (ONE action per step):
    - Walk step: "Move straight [N] steps." / "Move [N] steps."
    - Turn step: "Move left." / "Move right."
    - Stair step: "Take stairs up." / "Take stairs down."
@@ -168,147 +175,12 @@ Return strictly raw valid JSON (no markdown formatting around json):
         return parsed as LLMRouteKnowledge;
       }
     } catch (err) {
-      console.warn('Gemini API Key attempt notice, using local landmark corpus path builder:', err);
+      console.warn('Gemini API Key attempt notice:', err);
     }
   }
 
-  // Pure Deterministic Landmark Corpus Path Builder Fallback
-  return generateLocalCorpusAtomicPath(destinationQuery, startPoint);
-};
-
-// Deterministic Landmark Corpus Path Builder with Step 1 Landmark Orientation & Atomic Steps
-const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMRouteKnowledge => {
-  const destLower = destination.toLowerCase();
-
-  // Match starting landmark (Floor 1: Main Entrance, Floor 2: Stair Landing)
-  const landmark = findLandmarkByNameOrAlias(start) || 
-    (start.toLowerCase().includes('first floor') || start.toLowerCase().includes('stair') 
-      ? CAMPUS_LANDMARKS[1] 
-      : CAMPUS_LANDMARKS[0]);
-
-  const startName = landmark.name;
-  const facingOrientation = landmark.facingOrientation;
-
-  const steps: LLMStepInstruction[] = [];
-  let floor = landmark.floor;
-  let category: LLMRouteKnowledge['category'] = 'facility';
-
-  // Step 1: Landmark Facing Orientation Step
-  steps.push({
-    stepNumber: 1,
-    instruction: facingOrientation,
-    headingDegrees: 0,
-    headingText: "orient",
-    stepsCount: 0,
-    voicePrompt: facingOrientation
-  });
-
-  // Ground Floor Atomic Steps (Starting from Main Entrance)
-  const stepWalkToJunction: LLMStepInstruction = {
-    stepNumber: 2,
-    instruction: `Move straight 15 steps.`,
-    headingDegrees: 0,
-    headingText: "straight",
-    stepsCount: 15,
-    voicePrompt: `Move straight 15 steps.`
-  };
-
-  const stepTurnLeftJunction: LLMStepInstruction = {
-    stepNumber: 3,
-    instruction: "Move left.",
-    headingDegrees: 270,
-    headingText: "turn left",
-    stepsCount: 0,
-    voicePrompt: "Move left."
-  };
-
-  const stepWalkToStairs: LLMStepInstruction = {
-    stepNumber: 4,
-    instruction: "Move straight 14 steps.",
-    headingDegrees: 0,
-    headingText: "straight",
-    stepsCount: 14,
-    voicePrompt: "Move straight 14 steps."
-  };
-
-  const stepWalkToElevator: LLMStepInstruction = {
-    stepNumber: 5,
-    instruction: "Move straight 20 steps.",
-    headingDegrees: 0,
-    headingText: "straight",
-    stepsCount: 20,
-    voicePrompt: "Move straight 20 steps."
-  };
-
-  const stepWalkToDSLab: LLMStepInstruction = {
-    stepNumber: 5,
-    instruction: "Move straight 10 steps.",
-    headingDegrees: 0,
-    headingText: "straight",
-    stepsCount: 10,
-    voicePrompt: "Move straight 10 steps."
-  };
-
-  const stepArriveDSLab: LLMStepInstruction = {
-    stepNumber: 6,
-    instruction: `Destination reached (${destination}).`,
-    headingDegrees: 0,
-    headingText: "arrive",
-    stepsCount: 0,
-    voicePrompt: `Destination reached (${destination}).`
-  };
-
-  // First Floor Atomic Steps (Starting from Stair Landing)
-  const stepWalkToAuditorium: LLMStepInstruction = {
-    stepNumber: 2,
-    instruction: "Move straight 10 steps.",
-    headingDegrees: 0,
-    headingText: "straight",
-    stepsCount: 10,
-    voicePrompt: "Move straight 10 steps."
-  };
-
-  const stepArriveAuditorium: LLMStepInstruction = {
-    stepNumber: 3,
-    instruction: `Destination reached (${destination}).`,
-    headingDegrees: 0,
-    headingText: "arrive",
-    stepsCount: 0,
-    voicePrompt: `Destination reached (${destination}).`
-  };
-
-  if (landmark.floor === 2) {
-    steps.push(stepWalkToAuditorium, stepArriveAuditorium);
-  } else {
-    if (destLower.includes('data science') || destLower.includes('ds lab')) {
-      category = 'lab';
-      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToDSLab, stepArriveDSLab);
-    } else {
-      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator, stepArriveDSLab);
-    }
-  }
-
-  // Renumber step numbers sequentially
-  steps.forEach((s, idx) => {
-    s.stepNumber = idx + 1;
-  });
-
-  const totalSteps = steps.reduce((sum, s) => sum + s.stepsCount, 0);
-
-  return {
-    id: `ROUTE_ATOMIC_${destination.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${Date.now()}`,
-    category,
-    destinationName: destination,
-    aliases: [destination.toLowerCase()],
-    startPoint: startName,
-    facingOrientation,
-    building: 'Main Campus',
-    floor,
-    totalSteps,
-    totalDistanceMeters: Math.round(totalSteps * 0.75),
-    overviewSummary: `Atomic step navigation route from ${startName} to ${destination} (${steps.length} simple steps).`,
-    steps
-  };
+  // NO FAKE FALLBACKS! maindata.md is the ONLY source of truth!
+  return null;
 };
 
 export const generateLLMRouteWithGemini = async (
