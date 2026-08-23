@@ -5,8 +5,7 @@ import { VantaBackground } from './VantaBackground';
 
 import { speechService } from '../services/speechService';
 import { resolveLLMVoiceQueryAsync } from '../services/llmNavigationEngine';
-import { LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
-import { VoiceState } from '../types';
+import { LLMRouteKnowledge, VoiceState } from '../types';
 import { sensorService } from '../services/sensorService';
 import { CAMPUS_LANDMARKS, CampusLandmark } from '../data/landmarksData';
 

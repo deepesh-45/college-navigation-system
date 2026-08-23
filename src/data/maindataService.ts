@@ -1,5 +1,5 @@
 import rawMainDataMd from './maindata.md?raw';
-import { LLMRouteKnowledge, LLMStepInstruction } from './llmRoutesKnowledge';
+import { LLMRouteKnowledge, LLMStepInstruction } from '../types';
 import { findLandmarkByNameOrAlias } from './landmarksData';
 
 export interface MainDataAtomicStep {

@@ -1,4 +1,4 @@
-import { LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
+import { LLMRouteKnowledge } from '../types';
 import { generateRouteDirectlyFromCorpus, parseVoiceIntentWithGemini, ParsedVoiceIntent } from './geminiRouteService';
 import { findMainDataRouteFromMarkdown, convertMainDataToLLMRoute } from '../data/maindataService';
 

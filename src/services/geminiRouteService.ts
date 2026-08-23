@@ -1,4 +1,4 @@
-import { LLMRouteKnowledge, LLMStepInstruction } from '../data/llmRoutesKnowledge';
+import { LLMRouteKnowledge, LLMStepInstruction } from '../types';
 import { CAMPUS_LANDMARKS, findLandmarkByNameOrAlias, getAnchorLandmarkForFloor } from '../data/landmarksData';
 import { loadMainDataMarkdownText } from '../data/maindataService';
 

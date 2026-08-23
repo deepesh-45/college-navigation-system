@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LLMRouteKnowledge, LLMStepInstruction } from '../data/llmRoutesKnowledge';
+import { LLMRouteKnowledge, LLMStepInstruction } from '../types';
 import { Volume2, CheckCircle2, MapPin, ArrowUp, ArrowLeft, ArrowRight, Layers, ArrowUpRight, ArrowDownRight, Footprints, Compass } from 'lucide-react';
 import { sensorService } from '../services/sensorService';
 import { speechService } from '../services/speechService';
