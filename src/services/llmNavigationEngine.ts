@@ -1,5 +1,6 @@
 import { LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
 import { generateRouteDirectlyFromCorpus, parseVoiceIntentWithGemini, ParsedVoiceIntent } from './geminiRouteService';
+import { findMainDataRoute, convertMainDataToLLMRoute } from '../data/maindataService';
 
 export interface LLMNavigationResult {
   matched: boolean;
@@ -31,7 +32,21 @@ export const resolveLLMVoiceQueryAsync = async (
   const startPoint = explicitStartPoint && explicitStartPoint.trim() ? explicitStartPoint.trim() : (parsedIntent.startPoint || 'Main Entrance');
   const destination = parsedIntent.destination || query;
 
-  // 2. Synthesize Navigation Steps DIRECTLY from Raw Corpuses (Ground & First Floor Corpuses)
+  // 2. Check maindata.json FIRST for exact or saved landmark routes
+  const savedMainDataRoute = findMainDataRoute(destination, startPoint);
+  if (savedMainDataRoute) {
+    const route = convertMainDataToLLMRoute(savedMainDataRoute);
+    return {
+      matched: true,
+      isAmbiguous: false,
+      isNearbyLandmarkFallback: false,
+      parsedIntent: { startPoint, destination },
+      route,
+      responseMessage: `Found landmark route to ${route.destinationName} in maindata.json! Total ${route.steps.length} atomic steps.`
+    };
+  }
+
+  // 3. Fallback: Synthesize Navigation Steps DIRECTLY from Raw Corpuses (Ground & First Floor Corpuses)
   const corpusSynthesizedRoute = await generateRouteDirectlyFromCorpus(destination, startPoint);
 
   if (corpusSynthesizedRoute) {
@@ -41,7 +56,7 @@ export const resolveLLMVoiceQueryAsync = async (
       isNearbyLandmarkFallback: false,
       parsedIntent: { startPoint, destination },
       route: corpusSynthesizedRoute,
-      responseMessage: `Synthesized navigation from ${startPoint} to ${corpusSynthesizedRoute.destinationName} directly from campus corpus! Total ${corpusSynthesizedRoute.totalSteps} steps.`
+      responseMessage: `Synthesized navigation from ${startPoint} to ${corpusSynthesizedRoute.destinationName} directly from campus corpus! Total ${corpusSynthesizedRoute.steps.length} atomic steps.`
     };
   }
 
