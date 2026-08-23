@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Mic, MicOff, CheckCircle2, Copy, Download, X, FileText, Database, Plus, Layers, Compass, Save } from 'lucide-react';
 import { speechService } from '../services/speechService';
 import { CAMPUS_LANDMARKS, CampusLandmark } from '../data/landmarksData';
-import { addMainDataRoute, MAIN_DATA_ROUTES } from '../data/maindataService';
+import {
+  loadMainDataMarkdownText,
+  saveMainDataMarkdownText,
+  appendEntryToMainDataMarkdown,
+  parseMainDataMarkdown
+} from '../data/maindataService';
 
 interface AdminPortalViewProps {
   onClose: () => void;
@@ -17,6 +22,9 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
   const [destinationInput, setDestinationInput] = useState<string>('');
   const [pathInput, setPathInput] = useState<string>('');
 
+  // Live maindata.md Text State
+  const [mainDataMdText, setMainDataMdText] = useState<string>('');
+
   // Selected Landmark per floor
   const [selectedLandmarkId, setSelectedLandmarkId] = useState<string>('landmark_floor_1_main_entrance');
 
@@ -24,6 +32,11 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [synthesisResultMsg, setSynthesisResultMsg] = useState<string | null>(null);
   const [copiedDataset, setCopiedDataset] = useState<boolean>(false);
+
+  // Load live maindata.md text on mount
+  useEffect(() => {
+    setMainDataMdText(loadMainDataMarkdownText());
+  }, []);
 
   // Filter landmarks available for the selected floor
   const floorLandmarks: CampusLandmark[] = CAMPUS_LANDMARKS.filter(l => l.floor === selectedFloor);
@@ -87,7 +100,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
     setSelectedFloor(nextFloor);
   };
 
-  // SAVE LANDMARK ROUTE TO maindata.json AND DECOMPOSE TO ATOMIC STEPS
+  // APPEND ROUTE TO maindata.md IN FORMAT: Landmark to Destination - Path
   const handleSaveRoute = () => {
     if (!destinationInput.trim()) {
       alert('Please enter a Destination name!');
@@ -98,19 +111,18 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
       return;
     }
 
-    const savedRoute = addMainDataRoute(
-      selectedFloor,
+    const updatedMd = appendEntryToMainDataMarkdown(
       activeLandmark.name,
-      activeLandmark.facingOrientation,
       destinationInput.trim(),
       pathInput.trim()
     );
 
-    setSynthesisResultMsg(`✅ Saved "${savedRoute.destination}" to maindata.json (${savedRoute.atomicSteps.length} atomic steps generated)!`);
-    speechService.speak(`Saved route to ${savedRoute.destination} in main data JSON!`);
+    setMainDataMdText(updatedMd);
+    setSynthesisResultMsg(`✅ Appended "${activeLandmark.name} to ${destinationInput.trim()} - Path" to maindata.md!`);
+    speechService.speak(`Appended route to ${destinationInput.trim()} in main data markdown!`);
 
     if (onRouteAdded) {
-      onRouteAdded(savedRoute);
+      onRouteAdded();
     }
 
     // Reset form
@@ -118,25 +130,30 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
     setPathInput('');
   };
 
-  const generateExportCode = () => {
-    return JSON.stringify(MAIN_DATA_ROUTES, null, 2);
+  // Direct manual save of maindata.md editor content
+  const handleSaveEditorContent = () => {
+    saveMainDataMarkdownText(mainDataMdText);
+    setSynthesisResultMsg('✅ Saved updated `maindata.md` to website storage!');
+    speechService.speak('Saved maindata.md to website storage!');
   };
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(generateExportCode());
+    navigator.clipboard.writeText(mainDataMdText);
     setCopiedDataset(true);
     setTimeout(() => setCopiedDataset(false), 2500);
   };
 
-  const handleDownloadJSON = () => {
-    const blob = new Blob([generateExportCode()], { type: 'application/json' });
+  const handleDownloadMarkdown = () => {
+    const blob = new Blob([mainDataMdText], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `maindata_${Date.now()}.json`;
+    a.download = `maindata_${Date.now()}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const parsedRoutes = parseMainDataMarkdown(mainDataMdText);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col h-[100dvh] max-h-[100dvh] w-full overflow-hidden font-l3">
@@ -149,10 +166,10 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
           </div>
           <div>
             <h2 className="font-l2 text-base sm:text-lg font-black text-white leading-none">
-              Admin Portal — Landmark Route Manager (`maindata.json`)
+              Admin Portal — Live `maindata.md` Landmark Editor
             </h2>
             <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-              Floor Selection • Landmark Anchor • Atomic Step Decomposer
+              Format: <strong className="text-amber-400">Landmark to Destination - Path</strong>
             </p>
           </div>
         </div>
@@ -242,7 +259,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
           <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
             <FileText className="w-4 h-4 text-blue-500" />
-            Add / Update Landmark Route to `maindata.json`:
+            Append Landmark Route Entry to `maindata.md`:
           </span>
 
           {/* Destination Input Field */}
@@ -263,7 +280,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-[10px] font-bold uppercase text-slate-400 block">
-                Path / Walk Description from {activeLandmark.name}:
+                Path Description from {activeLandmark.name}:
               </label>
               <button
                 onClick={handleToggleRecording}
@@ -279,7 +296,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
             </div>
 
             <textarea
-              rows={4}
+              rows={3}
               value={pathInput}
               onChange={(e) => setPathInput(e.target.value)}
               placeholder="e.g. Move straight 15 steps. Move left. Move straight 14 steps. Move straight 10 steps. Destination reached."
@@ -287,14 +304,39 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
             />
           </div>
 
-          {/* SAVE BUTTON */}
+          {/* APPEND BUTTON */}
           <button
             onClick={handleSaveRoute}
             className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
           >
             <Save className="w-4 h-4" />
-            <span>Save Route to `maindata.json` & Breakdown Atomic Steps ➔</span>
+            <span>Append Entry: "{activeLandmark.name} to {destinationInput || 'Destination'} - Path" ➔</span>
           </button>
+        </div>
+
+        {/* 4. LIVE maindata.md TEXT AREA EDITOR ON WEBSITE */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-black uppercase text-slate-300 flex items-center gap-1.5">
+              <FileText className="w-4 h-4 text-amber-400" />
+              Website Live `maindata.md` File Editor:
+            </label>
+            <button
+              onClick={handleSaveEditorContent}
+              className="px-3 py-1 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-black flex items-center gap-1 active:scale-95 transition-all"
+            >
+              <Save className="w-3 h-3" />
+              <span>Save `maindata.md`</span>
+            </button>
+          </div>
+
+          <textarea
+            rows={8}
+            value={mainDataMdText}
+            onChange={(e) => setMainDataMdText(e.target.value)}
+            placeholder="# Smart Campus Main Landmark Data&#10;&#10;<!-- Format per line: Landmark to Destination - Path -->&#10;Main Entrance to Data Science Lab - Move straight 15 steps. Move left. Move straight 14 steps. Move straight 10 steps. Destination reached."
+            className="w-full p-3.5 rounded-2xl border border-slate-700 font-mono text-xs text-amber-300 bg-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none shadow-inner leading-relaxed"
+          />
         </div>
 
         {/* NOTIFICATION BANNER */}
@@ -305,18 +347,18 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
           </div>
         )}
 
-        {/* 4. CURRENT STORED ROUTES IN maindata.json */}
+        {/* 5. PARSED ROUTES STATS & LIST */}
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
           <span className="text-xs font-black uppercase tracking-wider text-slate-300 block">
-            Current Saved Routes in `maindata.json` ({MAIN_DATA_ROUTES.length}):
+            Parsed Routes in `maindata.md` ({parsedRoutes.length}):
           </span>
 
           <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-            {MAIN_DATA_ROUTES.map((route) => (
+            {parsedRoutes.map((route) => (
               <div key={route.id} className="p-3 rounded-xl bg-slate-800 border border-slate-700 space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold text-white">
                   <span>📍 {route.startLandmark} ➔ 🎯 {route.destination}</span>
-                  <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-blue-900 text-blue-200">
+                  <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-900 text-amber-200">
                     Floor {route.floor} • {route.atomicSteps.length} Atomic Steps
                   </span>
                 </div>
@@ -336,15 +378,15 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
           className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all shadow border border-slate-700"
         >
           <Copy className="w-4 h-4 text-blue-400" />
-          <span>{copiedDataset ? 'Copied JSON!' : 'Copy JSON'}</span>
+          <span>{copiedDataset ? 'Copied Markdown!' : 'Copy Markdown'}</span>
         </button>
 
         <button
-          onClick={handleDownloadJSON}
+          onClick={handleDownloadMarkdown}
           className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg"
         >
           <Download className="w-4 h-4 text-emerald-300" />
-          <span>Download `maindata.json`</span>
+          <span>Download `maindata.md`</span>
         </button>
       </div>
     </div>

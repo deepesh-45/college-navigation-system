@@ -1,5 +1,6 @@
-import initialMainData from './json/maindata.json';
+import rawMainDataMd from './maindata.md?raw';
 import { LLMRouteKnowledge, LLMStepInstruction } from './llmRoutesKnowledge';
+import { findLandmarkByNameOrAlias } from './landmarksData';
 
 export interface MainDataAtomicStep {
   stepNumber: number;
@@ -21,33 +22,28 @@ export interface MainDataRoute {
   atomicSteps: MainDataAtomicStep[];
 }
 
-const STORAGE_KEY = 'MAIN_DATA_JSON';
+const STORAGE_KEY_MD = 'MAIN_DATA_MD';
 
-// Load stored routes from localStorage or initial maindata.json
-export const loadMainDataRoutes = (): MainDataRoute[] => {
+// Load stored maindata.md text from localStorage or default maindata.md file
+export const loadMainDataMarkdownText = (): string => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
+    const saved = localStorage.getItem(STORAGE_KEY_MD);
+    if (saved !== null) {
+      return saved;
     }
   } catch (e) {
-    console.warn('Notice loading MAIN_DATA_JSON from storage:', e);
+    console.warn('Notice loading MAIN_DATA_MD from storage:', e);
   }
-  return initialMainData as MainDataRoute[];
+  return rawMainDataMd || '# Smart Campus Main Landmark Data\n\n<!-- Format per line: Landmark to Destination - Path -->\n';
 };
 
-export const saveMainDataRoutes = (routes: MainDataRoute[]) => {
+export const saveMainDataMarkdownText = (mdText: string) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(routes, null, 2));
+    localStorage.setItem(STORAGE_KEY_MD, mdText);
   } catch (e) {
-    console.warn('Notice saving MAIN_DATA_JSON to storage:', e);
+    console.warn('Notice saving MAIN_DATA_MD to storage:', e);
   }
 };
-
-export const MAIN_DATA_ROUTES: MainDataRoute[] = loadMainDataRoutes();
 
 // Decompose raw walk path description into small atomic single-work steps
 // Example output: "Move left", "Move 33 steps", "Move right", "Move 2 steps", "Destination reached"
@@ -129,44 +125,67 @@ export const breakdownPathToAtomicSteps = (pathText: string, destination: string
   return steps;
 };
 
-// Add new route entry to maindata.json and storage
-export const addMainDataRoute = (
-  floor: number,
-  startLandmark: string,
-  facingOrientation: string,
-  destination: string,
-  pathDescription: string
-): MainDataRoute => {
-  const atomicSteps = breakdownPathToAtomicSteps(pathDescription, destination);
+// Parse maindata.md lines at runtime
+// Format per line: Landmark to Destination - Path
+export const parseMainDataMarkdown = (mdText: string): MainDataRoute[] => {
+  const routes: MainDataRoute[] = [];
+  const lines = mdText.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#') && !l.startsWith('<!--'));
 
-  const newRoute: MainDataRoute = {
-    id: `route_${floor === 1 ? 'gf' : 'ff'}_${destination.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
-    floor,
-    startLandmark,
-    facingOrientation,
-    destination,
-    pathDescription,
-    atomicSteps
-  };
+  for (const line of lines) {
+    if (!line.includes(' - ') || !line.toLowerCase().includes(' to ')) continue;
 
-  // Replace existing route if same destination & floor exists, or push new
-  const existingIdx = MAIN_DATA_ROUTES.findIndex(r => r.floor === floor && r.destination.toLowerCase() === destination.toLowerCase());
-  if (existingIdx >= 0) {
-    MAIN_DATA_ROUTES[existingIdx] = newRoute;
-  } else {
-    MAIN_DATA_ROUTES.push(newRoute);
+    const parts = line.split(' - ');
+    const headerPart = parts[0].trim();
+    const pathDescription = parts.slice(1).join(' - ').trim();
+
+    const headerSplit = headerPart.split(/ to /i);
+    if (headerSplit.length < 2) continue;
+
+    const startLandmark = headerSplit[0].trim();
+    const destination = headerSplit[1].trim();
+
+    const landmarkObj = findLandmarkByNameOrAlias(startLandmark);
+    const floor = landmarkObj ? landmarkObj.floor : (startLandmark.toLowerCase().includes('stair') ? 2 : 1);
+    const facingOrientation = landmarkObj ? landmarkObj.facingOrientation : (floor === 2 ? 'Face towards the wall at the end of the staircase' : 'Face the same way as you enter through the main entrance');
+
+    const atomicSteps = breakdownPathToAtomicSteps(pathDescription, destination);
+
+    routes.push({
+      id: `route_${floor === 1 ? 'gf' : 'ff'}_${destination.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
+      floor,
+      startLandmark,
+      facingOrientation,
+      destination,
+      pathDescription,
+      atomicSteps
+    });
   }
 
-  saveMainDataRoutes(MAIN_DATA_ROUTES);
-  return newRoute;
+  return routes;
 };
 
-// Search stored maindata.json route
-export const findMainDataRoute = (query: string, startLandmark?: string): MainDataRoute | null => {
+// Append new entry line to maindata.md in format: Landmark to Destination - Path
+export const appendEntryToMainDataMarkdown = (
+  startLandmark: string,
+  destination: string,
+  pathDescription: string
+): string => {
+  const currentMd = loadMainDataMarkdownText();
+  const newLine = `${startLandmark} to ${destination} - ${pathDescription.replace(/\n+/g, ' ').trim()}`;
+  const updatedMd = currentMd.trim() + '\n' + newLine + '\n';
+  saveMainDataMarkdownText(updatedMd);
+  return updatedMd;
+};
+
+// Search stored maindata.md route at runtime
+export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: string): MainDataRoute | null => {
+  const mdText = loadMainDataMarkdownText();
+  const routes = parseMainDataMarkdown(mdText);
+
   const normalized = query.toLowerCase().trim();
   if (!normalized) return null;
 
-  for (const route of MAIN_DATA_ROUTES) {
+  for (const route of routes) {
     const destMatch = route.destination.toLowerCase().includes(normalized) || normalized.includes(route.destination.toLowerCase());
     const landmarkMatch = !startLandmark || route.startLandmark.toLowerCase().includes(startLandmark.toLowerCase());
 

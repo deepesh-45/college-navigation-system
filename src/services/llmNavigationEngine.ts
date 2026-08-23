@@ -1,6 +1,6 @@
 import { LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
 import { generateRouteDirectlyFromCorpus, parseVoiceIntentWithGemini, ParsedVoiceIntent } from './geminiRouteService';
-import { findMainDataRoute, convertMainDataToLLMRoute } from '../data/maindataService';
+import { findMainDataRouteFromMarkdown, convertMainDataToLLMRoute } from '../data/maindataService';
 
 export interface LLMNavigationResult {
   matched: boolean;
@@ -32,8 +32,8 @@ export const resolveLLMVoiceQueryAsync = async (
   const startPoint = explicitStartPoint && explicitStartPoint.trim() ? explicitStartPoint.trim() : (parsedIntent.startPoint || 'Main Entrance');
   const destination = parsedIntent.destination || query;
 
-  // 2. Check maindata.json FIRST for exact or saved landmark routes
-  const savedMainDataRoute = findMainDataRoute(destination, startPoint);
+  // 2. Check maindata.md FIRST at runtime for exact or saved landmark routes
+  const savedMainDataRoute = findMainDataRouteFromMarkdown(destination, startPoint);
   if (savedMainDataRoute) {
     const route = convertMainDataToLLMRoute(savedMainDataRoute);
     return {
@@ -42,7 +42,7 @@ export const resolveLLMVoiceQueryAsync = async (
       isNearbyLandmarkFallback: false,
       parsedIntent: { startPoint, destination },
       route,
-      responseMessage: `Found landmark route to ${route.destinationName} in maindata.json! Total ${route.steps.length} atomic steps.`
+      responseMessage: `Found landmark route to ${route.destinationName} in maindata.md! Total ${route.steps.length} atomic steps.`
     };
   }
 
