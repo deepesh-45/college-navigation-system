@@ -50,29 +50,26 @@ Follow the exact slide-by-slide structure detailed below.
 - **Headline**: *"Indoor Wayfinding is Broken: GPS Fails Where It Matters Most"*
 - **Core Pain Points**:
   1. 🚫 **No Indoor GPS Signal**: Satellite GPS signals fail to penetrate concrete walls and multi-story academic blocks.
-  2. 🗺️ **Complex Sprawling Layouts**: **68% of first-year students** and visitors report getting lost during their first month on campus.
-  3. ♿ **Accessibility Barriers**: Visually impaired or mobility-challenged users struggle with static 2D maps.
-  4. 💸 **High Hardware Costs**: Traditional indoor positioning (beacons/Wi-Fi RTT) costs thousands of dollars per building.
+  2. 🗺️ **Complex Sprawling Layouts**: Multi-floor layouts with similar hallways make manual indoor orientation difficult for new students and visitors.
+  3. ♿ **Accessibility Barriers**: Visually impaired or mobility-challenged users struggle with static 2D map blueprints while walking.
+  4. 💸 **Infrastructure Dependency**: Traditional indoor positioning requires installing and maintaining physical hardware on every floor.
 - **Visual Direction**: Graphic of a student looking lost in a university corridor checking a phone with a red "Signal Lost" warning pin.
-- **Chart / Infographic**: **Donut Chart** — *"First-Year Students Lost in First Month"* (68% Lost vs 32% Found).
+- **Infographic Diagram**: **Problem Breakdown Diagram** illustrating GPS Satellite Blockage ➔ Concrete Signal Attenuation ➔ Hallway Orientation Loss.
 
 ---
 
 ### Slide 3 — Existing Solutions & Limitations
-- **Headline**: *"Current Market Options are Hardware-Heavy & Expensive to Scale"*
+- **Headline**: *"Current Market Options are Hardware-Heavy & Hard to Scale"*
 - **Detailed Comparison**:
 
-| Solution | Technology | Major Limitations |
+| Solution | Technology | Factual Limitations |
 | :--- | :--- | :--- |
-| **BLE Beacons (MapXus/MazeMap)** | Bluetooth Beacons every 10m | **High Cost ($8,500+/building)**, battery maintenance, wall damage. |
-| **Wi-Fi RTT / Fingerprinting** | Router signal strength triangulation | High signal noise, drift errors, requires network upgrades. |
-| **Static 2D Touch Kiosks** | Entrance physical kiosks | Fixed location, non-portable, zero walking guidance. |
+| **BLE Beacons (MapXus/MazeMap)** | Bluetooth Beacons mounted on walls/ceilings | High hardware purchasing, periodic battery replacements, wall damage. |
+| **Wi-Fi Fingerprinting / RTT** | Router signal strength triangulation | High signal noise, drift errors, network infrastructure dependency. |
+| **Static 2D Touch Kiosks** | Entrance physical kiosks | Stationary location, non-portable, zero walking guidance. |
 
-- **Visual Direction**: Hardware icon comparison showing wall-mounted Bluetooth beacons with dollar signs and warning symbols.
-- **Chart**: **Comparative Bar Chart** — *"Setup & Maintenance Cost per Building ($)"*:
-  - *BLE Beacon Infrastructure*: **High ($8,500+)**
-  - *Wi-Fi Fingerprinting*: **Medium ($5,000+)**
-  - *Smart Campus AI (Our Solution)*: **Ultra-Low ($0 Hardware)**
+- **Visual Direction**: Hardware icon comparison showing wall-mounted Bluetooth beacons with warning symbols.
+- **Chart / Diagram**: **Infrastructure Matrix Diagram** comparing Hardware Maintenance Overhead (High) vs Our Solution (Zero Hardware).
 
 ---
 
@@ -118,7 +115,7 @@ Follow the exact slide-by-slide structure detailed below.
   - 👣 **Live Footstep Counter & Cockpit**: Real-time sensor footstep tracking & haptic feedback.
   - 🛠️ **Admin Live Markdown Editor**: Real-time `maindata.md` live website editor and route mapper.
 - **Unique Selling Proposition (USP)**:
-  - 🚀 **Zero Hardware Infrastructure ($0 Setup Cost)**
+  - 🚀 **Zero Hardware Infrastructure** (Pure software solution)
   - 🔒 **100% Deterministic & Line-Faithful** (Zero AI hallucinations)
   - 🧠 **Flexible Intent & Numeric Matching** (`"washroom"` ➔ `"Boys/Girls Washroom"`, `"f05"` ➔ `"Room F-05"`)
   - ⚡ **Zero Route Caching** (Fresh markdown read on every query)
@@ -127,13 +124,13 @@ Follow the exact slide-by-slide structure detailed below.
 ---
 
 ### Slide 7 — Business Model & Monetization
-- **Headline**: *"Freemium B2B SaaS Model for Institutions & Enterprises"*
+- **Headline**: *"B2B SaaS Model for Institutions & Enterprises"*
 - **Monetization Streams**:
   1. 🏢 **Enterprise Campus License**: Annual software licensing per university block, hospital, or shopping mall.
-  2. 🛠️ **Admin Route Portal**: Subscriptions for administrative route management and foot-traffic analytics.
+  2. 🛠️ **Admin Route Portal**: Subscriptions for administrative route management and floor metadata tools.
   3. 🔌 **White-Label Student App SDK**: Embed our voice navigation cockpit into existing official college apps.
 - **Visual Direction**: Business dashboard graphic demonstrating campus fleet management and active route analytics.
-- **Chart**: **3-Year Revenue Growth Bar Chart ($)** comparing Enterprise Campus Subscriptions vs White-Label SDK Licenses.
+- **Chart / Infographic**: **Revenue Stream Architecture Diagram** displaying Enterprise Licenses, Admin Subscriptions, and SDK Integrations.
 
 ---
 

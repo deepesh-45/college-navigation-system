@@ -1,4 +1,4 @@
-import landmarksJson from './json/landmarks.json';
+import landmarksJson from './landmarks.json';
 
 export interface CampusLandmark {
   id: string;

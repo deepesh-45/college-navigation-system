@@ -25,30 +25,30 @@
 5. [MVP Features + USP](#5-mvp-features--usp)
 6. [Business Model](#6-business-model)
 7. [Long-Term Goals + Feasibility](#7-long-term-goals--feasibility)
-8. [Thank You](#8-thank-you)
+8. [Team & Acknowledgments](#8-team--acknowledgments)
 
 ---
 
 ## 1. Project Problem
 
-Indoor wayfinding across large multi-building university campuses is broken and stressful for students, visitors, and faculty.
+Indoor wayfinding across multi-building academic complexes presents fundamental navigation challenges for new students, visitors, and campus staff.
 
-* 🚫 **No Indoor GPS Signal**: Satellite GPS signals fail to penetrate concrete walls and multi-story academic blocks.
-* 🗺️ **Complex Sprawling Layouts**: **68% of first-year students** report getting lost during their first month on campus.
-* ♿ **Accessibility Barriers**: Visually impaired or mobility-challenged users struggle to interpret traditional flat 2D maps.
-* 💸 **Exorbitant Hardware Costs**: Traditional indoor positioning systems cost thousands of dollars per building to install and maintain.
+* 🚫 **Indoor GPS Signal Loss**: Satellite GPS signals fail to penetrate concrete walls, metal structures, and multi-story academic blocks.
+* 🗺️ **Complex Sprawling Layouts**: Multi-floor layouts with similar-looking hallways make manual orientation difficult.
+* ♿ **Accessibility Barriers**: Visually impaired or mobility-challenged individuals struggle to navigate using static 2D map blueprints while walking.
+* 💸 **Infrastructure Dependency**: Traditional indoor positioning systems require installing and maintaining dedicated hardware across every floor.
 
 ---
 
 ## 2. Existing Solutions & Limitations
 
-Current market options rely heavily on hardware infrastructure and manual mapping:
+Current market options rely heavily on physical hardware infrastructure and manual spatial tagging:
 
-| Existing Solution | How It Works | Major Limitations |
+| Solution | Mechanism | Factual Limitations |
 | :--- | :--- | :--- |
-| **BLE Beacons (e.g., MapXus, MazeMap)** | Mounted Bluetooth beacons every 10–15 meters on walls/ceilings. | **High Hardware Cost ($8,500+/building)**, severe battery maintenance, wall damage. |
-| **Wi-Fi RTT / Fingerprinting** | Triangulates position using router signal strength. | High signal noise, drift errors, requires expensive network upgrades. |
-| **Static 2D Touch Kiosks** | Physical kiosks placed at building entrances. | Fixed location, non-portable, zero step-by-step guidance while walking. |
+| **BLE Beacons (e.g., MapXus, MazeMap)** | Bluetooth beacons mounted on walls and ceilings every few meters. | Dedicated hardware purchasing, periodic battery replacements, physical installation overhead. |
+| **Wi-Fi Fingerprinting / RTT** | Signal strength triangulation across router networks. | Signal noise from walls/people, drift errors, network infrastructure dependency. |
+| **Static Entrance Kiosks** | Fixed touchscreen displays installed at building lobbies. | Stationary location, non-portable, zero walking turn-by-turn guidance. |
 
 ---
 
@@ -56,13 +56,13 @@ Current market options rely heavily on hardware infrastructure and manual mappin
 
 **"A Voice Conversation Replaces Complex Maps."**
 
-We built a **hardware-free, voice-first indoor navigation system** powered by Gemini AI and structured Markdown data. Instead of looking at confusing 2D blueprints while walking, users simply speak or type where they want to go, and receive personalized turn-by-turn spoken guidance.
+We built a **hardware-free, voice-first indoor navigation system** powered by Gemini AI and structured Markdown data. Users speak or type where they want to go, and receive step-by-step spoken instructions anchored to physical floor landmarks.
 
-### Key Pillars of Our Idea:
-1. 📍 **Landmark Anchors (`landmarks.json`)**: Navigation starts by anchoring to physical floor landmarks (*"Main Entrance"* on Ground Floor, *"Stair Landing"* on First Floor).
-2. 🧭 **Facing Orientation Guidance**: Step 1 instructs the user how to stand before walking (*"Face towards the wall at the end of the staircase"*).
-3. 👣 **Atomic Step Guidance**: Paths are decomposed into simple, single-work atomic actions (*"Turn right"*, *"Move straight 28 steps"*, *"Destination reached"*).
-4. 📄 **Single Source of Truth (`maindata.md`)**: All landmark routes are defined in a clean markdown file, editable in real-time via the Admin Portal.
+### Key Factual Pillars of Our Solution:
+1. 📍 **Landmark Anchors (`landmarks.json`)**: Navigation begins from verified floor anchor landmarks (*"Main Entrance"* on Ground Floor, *"Stair Landing"* on First Floor).
+2. 🧭 **Facing Orientation Guidance**: Step 1 instructs initial body orientation before walking (*"Face towards the wall at the end of the staircase"*).
+3. 👣 **Atomic Step Guidance**: Path text is decomposed into single, unambiguous action steps (*"Turn right"*, *"Move straight 28 steps"*, *"Destination reached"*).
+4. 📄 **Single Source of Truth (`maindata.md`)**: All landmark routes are stored in a clean markdown database, editable in real time via the Admin Portal.
 
 ---
 
@@ -83,45 +83,45 @@ graph TD
 
 ### Stage 1: Intent Extraction & `nodes.md` Path Validation
 - Uses `buildGeminiDestinationExtractorAndValidatorPrompt` to parse natural language queries (e.g., *"where is washroom"*, *"take me to f05"*, *"ds lab"*).
-- Matches intent against [`src/data/nodes/nodes.md`](file:///Users/deepeshpatel/college-navigation-system/src/data/nodes/nodes.md) to confirm path existence.
+- Matches intent against [`src/data/nodes.md`](file:///Users/deepeshpatel/college-navigation-system/src/data/nodes.md) to verify path existence.
 
 ### Stage 2: 100% Line-Faithful Step Generator (`maindata.md`)
 - Uses `buildGeminiNavigationSystemPrompt` to locate the exact matching line in [`src/data/maindata.md`](file:///Users/deepeshpatel/college-navigation-system/src/data/maindata.md).
-- Constructs atomic steps 100% faithfully from that exact line without hallucination or fake fallbacks.
+- Constructs atomic steps 100% faithfully from that exact line without synthetic route generation or hallucinated paths.
 
 ---
 
 ## 5. MVP Features + USP
 
 ### 🌟 MVP Core Features
-* 🏢 **Floor & Landmark Selection**: Ground Floor (*Main Entrance*) & First Floor (*Stair Landing*) selection.
-* 🗣️ **Voice & Type Input**: Integrated browser Web Speech STT and free-text search.
-* 🧭 **Initial Facing Orientation Card**: Visual amber instruction banner and spoken orientation prompt before Step 1 starts.
-* 👣 **Live Footstep Counter & Compass Cockpit**: Real-time sensor integration via device accelerometer and haptic feedback.
-* 🛠️ **Admin Live Markdown Editor**: Admin Panel to add, edit, and save routes directly to `maindata.md` at runtime.
+* 🏢 **Floor & Landmark Selector**: Ground Floor (*Main Entrance*) & First Floor (*Stair Landing*) selection.
+* 🗣️ **Voice & Text Input**: Web Speech API integration for speech-to-text input and free-text search.
+* 🧭 **Initial Facing Orientation Card**: Amber instruction banner and spoken prompt before Step 1 starts.
+* 👣 **Live Footstep Counter & Cockpit**: Device accelerometer sensor integration for step counting and haptic feedback.
+* 🛠️ **Admin Live Markdown Editor**: Real-time `maindata.md` live website editor and route appender.
 
-### 💎 Unique Selling Proposition (USP)
-* 🚀 **Zero Hardware Infrastructure ($0 Setup Cost)**: No BLE beacons, no extra sensors, no hardware maintenance.
-* 🔒 **100% Deterministic & Reliable**: Powered strictly by `maindata.md` with zero synthetic route hallucinations.
-* 🧠 **Flexible Intent & Numeric Matching**: Automatically resolves synonyms (`"washroom"` ➔ `"Boys/Girls Washroom"`, `"f-05"` ➔ `"Room F-05"`).
-* ⚡ **Zero Route Caching**: Every search parses fresh markdown data to guarantee live metadata sync.
+### 💎 Factual Unique Selling Proposition (USP)
+* 🚀 **Zero Hardware Infrastructure**: Operates purely through software without wall beacons or extra sensors.
+* 🔒 **100% Line-Faithful Execution**: Powered strictly by `maindata.md` route definitions.
+* 🧠 **Flexible Intent & Numeric Matching**: Resolves synonyms and numeric formats (`"washroom"` ➔ `"Boys/Girls Washroom"`, `"f-05"` ➔ `"Room F-05"`).
+* ⚡ **Zero Route Caching**: Parses fresh markdown data on every query to ensure live metadata sync.
 
 ---
 
 ## 6. Business Model
 
-Our solution follows a **B2B SaaS Freemium Model** targeted at educational institutions and commercial indoor spaces:
+Our solution follows a **B2B SaaS Freemium Model** targeted at educational institutions, hospitals, and commercial complexes:
 
 ```text
  ┌─────────────────────────────────────────────────────────────────────────────────┐
- │ 1. ENTERPRISE CAMPUS LICENSE (Subscription)                                    │
- │ • Annual software licensing per university block, hospital, or mall.           │
+ │ 1. ENTERPRISE CAMPUS LICENSE                                                   │
+ │ • Software licensing for university blocks, hospitals, and commercial venues.  │
  ├─────────────────────────────────────────────────────────────────────────────────┤
- │ 2. ADMIN ROUTE MANAGER & ANALYTICS DASHBOARD                                   │
- │ • Web portal for campus admins to manage landmark paths and view foot-traffic. │
+ │ 2. ADMIN ROUTE PORTAL & METADATA MANAGEMENT                                     │
+ │ • Web portal for campus administrators to manage landmark paths in maindata.md.│
  ├─────────────────────────────────────────────────────────────────────────────────┤
  │ 3. WHITE-LABEL STUDENT APP SDK                                                 │
- │ • Embed our voice navigation cockpit into existing official college mobile apps.│
+ │ • Embed the voice navigation cockpit into existing official student mobile apps.│
  └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -129,26 +129,26 @@ Our solution follows a **B2B SaaS Freemium Model** targeted at educational insti
 
 ## 7. Long-Term Goals + Feasibility
 
-### 🚀 Roadmap & Scale
+### 🚀 Strategic Growth Roadmap
 
 ```text
-  Phase 1 (Current MVP)       Phase 2 (Q3)               Phase 3 (Q4)               Phase 4 (Year 2)
- ┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
- │ Landmark Navigation │ ➔  │ Offline Local LLM   │ ➔  │ WebXR AR Camera     │ ➔  │ Universal Indoor    │
- │ Engine & maindata.md│    │ (Ollama / Llama-3)  │    │ Wayfinding Overlays │    │ SDK (Airports/Malls)│
- └─────────────────────┘    └─────────────────────┘    └─────────────────────┘    └─────────────────────┘
+  Level 1 (Current MVP)       Level 2 (Complete Navigation)    Level 3 (Offline LLM & WebXR AR)
+ ┌──────────────────────┐    ┌─────────────────────────────┐  ┌────────────────────────────────┐
+ │ Ground & First Floor │ ➔  │ Multi-Building Cross-Floor  │ ➔│ Offline Local WebAssembly LLM  │
+ │ Landmark Path Engine │    │ Landmark Graph Network      │  │ & WebXR Camera AR Overlays     │
+ └──────────────────────┘    └─────────────────────────────┘  └────────────────────────────────┘
 ```
 
-* **Offline Capabilities**: Integrating local WebAssembly LLMs (Ollama / Llama-3-Nano) for 100% offline navigation in underground basements.
-* **WebXR Augmented Reality**: Adding camera AR arrows over physical hallways for visual direction overlay.
-* **Universal indoor SDK**: Expanding beyond academic blocks to shopping malls, airports, and healthcare facilities.
+* **Level 1 — Current MVP**: Landmark navigation engine, facing orientation anchors, and live `maindata.md` Admin Portal editor.
+* **Level 2 — Complete Campus Navigation**: Multi-building cross-floor landmark graph mapping and white-label SDK integration.
+* **Level 3 — Offline Local LLM & WebXR AR**: Local WebAssembly LLMs (e.g. Ollama / Llama-3-Nano) for internet-free basement navigation + WebXR camera AR overlays.
 
 ---
 
 ## 8. Team & Acknowledgments
 
 ### 👥 Team Members:
-* **Deepesh Patel**
+* **Deepesh Patel** (Lead Developer)
 * **Jatin Karma**
 * **Anushka Dubey**
 * **Divya Verma**

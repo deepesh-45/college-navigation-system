@@ -1,5 +1,5 @@
 import rawMainDataMd from './maindata.md?raw';
-import rawNodesMd from './nodes/nodes.md?raw';
+import rawNodesMd from './nodes.md?raw';
 import { LLMRouteKnowledge, LLMStepInstruction } from '../types';
 import { findLandmarkByNameOrAlias } from './landmarksData';
 
