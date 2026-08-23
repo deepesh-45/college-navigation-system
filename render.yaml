@@ -1,14 +1,13 @@
 # =================================================================
 # RENDER BLUEPRINT CONFIGURATION FILE (render.yaml)
-# Smart AI Campus Navigation System
+# Smart AI Campus Navigation System (Static Site)
 # =================================================================
 
 services:
-  - type: web
+  - type: static
     name: college-navigation-system
-    runtime: static
     buildCommand: npm run build
-    staticPublishPath: ./dist
+    publishPath: ./dist
     routes:
       - type: rewrite
         source: /*
