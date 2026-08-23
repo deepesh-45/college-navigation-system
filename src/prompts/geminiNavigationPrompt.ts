@@ -1,10 +1,7 @@
 /**
  * Dedicated System Prompt Builder for Smart Campus AI Navigation Engine
  * 
- * Provides Gemini AI API with:
- * 1. Starting Landmark & Facing Orientation Rule (Step 1)
- * 2. Destination Query
- * 3. Live maindata.md Landmark Route Database (Single Source of Truth)
+ * Focuses on USER INTENT & NUMERIC/KEYWORD MATCHING over exact string equality!
  */
 
 export interface PromptInputParams {
@@ -22,7 +19,7 @@ export const buildGeminiNavigationSystemPrompt = (params: PromptInputParams): st
   const { startLandmarkName, facingOrientation, destinationQuery, mainDataMdText, selectedFloor = 1 } = params;
 
   return `You are the Master Smart Campus AI Navigation Engine.
-Extract the route matching Starting Landmark "${startLandmarkName}" and Destination "${destinationQuery}" STRICTLY from maindata.md.
+Parse maindata.md and extract the navigation path matching Starting Landmark "${startLandmarkName}" and Destination Intent "${destinationQuery}".
 
 STARTING LANDMARK ORIENTATION INSTRUCTION:
 "${facingOrientation}"
@@ -30,11 +27,19 @@ STARTING LANDMARK ORIENTATION INSTRUCTION:
 LIVE MAINDATA.MD LANDMARK ROUTES (SINGLE SOURCE OF TRUTH):
 ${mainDataMdText}
 
-CRITICAL RULES:
-1. Use ONLY the paths defined in maindata.md. If the destination "${destinationQuery}" is NOT present in maindata.md, return JSON {"error": "Path not found in maindata.md"}.
-2. Step 1 MUST be the Landmark Facing Orientation Instruction:
+CRITICAL INTENT & NUMERIC MATCHING RULES:
+1. DO NOT require an exact string match! Focus on USER INTENT and NUMERIC/KEYWORD MATCHING:
+   - "washroom" / "toilet" / "restroom" -> matches "Watercooler or Boys washroom First floor or Girls washroom First Floor"
+   - "water" / "watercooler" / "drinking water" -> matches "Watercooler or Boys washroom First floor or Girls washroom First Floor"
+   - "f-05" / "f05" / "room 5" / "smart app" -> matches "Room F-05 or Smart application development Lab"
+   - "ds lab" / "data science" / "language lab" / "f09" / "f08" -> matches "Communication Language Lab or Data Science Lab or Room F-09 F-08 or Room"
+   - "lift" / "elevator" -> matches "Elevator First Floor or Lift First floor"
+   - "pantry" / "store" -> matches "Store/Pantry room"
+   - "mechanical" / "mech dept" -> matches "Mechanical Engineering Department"
+2. If no matching entry exists in maindata.md for the intent of "${destinationQuery}", return JSON: {"error": "Path not found in maindata.md"}.
+3. Step 1 MUST be the Landmark Facing Orientation Instruction:
    "instruction": "${facingOrientation}"
-3. Subsequent steps MUST be simple atomic single actions (ONE action per step):
+4. Subsequent steps MUST be simple atomic single actions (ONE action per step):
    - Walk step: "Move straight [N] steps." / "Move [N] steps."
    - Turn step: "Move left." / "Move right."
    - Stair step: "Take stairs up." / "Take stairs down."

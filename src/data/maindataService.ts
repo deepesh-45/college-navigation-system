@@ -47,7 +47,6 @@ export const saveMainDataMarkdownText = (mdText: string) => {
 };
 
 // Decompose raw walk path description into small atomic single-work steps
-// Example output: "Move left", "Move 33 steps", "Move right", "Move 2 steps", "Destination reached"
 export const breakdownPathToAtomicSteps = (pathText: string, destination: string): MainDataAtomicStep[] => {
   const steps: MainDataAtomicStep[] = [];
   const sentences = pathText.split(/(?<=[.!?])\s+|\s*\.\s*|\n+/).filter(s => s.trim().length > 0);
@@ -128,7 +127,6 @@ export const breakdownPathToAtomicSteps = (pathText: string, destination: string
 };
 
 // Parse maindata.md lines at runtime
-// Format per line: Landmark to Destination - Path
 export const parseMainDataMarkdown = (mdText: string): MainDataRoute[] => {
   const routes: MainDataRoute[] = [];
   const lines = mdText.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#') && !l.startsWith('<!--'));
@@ -184,38 +182,75 @@ export const appendEntryToMainDataMarkdown = (
   return updatedMd;
 };
 
+// Helper: Normalize text for flexible intent matching
 const normalizeTextForSearch = (str: string): string => {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '');
 };
 
-// Search stored maindata.md route strictly from maindata.md
+// Helper: Extract numbers from string (e.g. "room f-05" -> 5, "f12" -> 12)
+const extractNumbersFromString = (str: string): number[] => {
+  const matches = str.match(/\d+/g);
+  return matches ? matches.map(m => parseInt(m, 10)) : [];
+};
+
+// INTENT & NUMERIC KEYWORD SEARCH IN MAINDATA.MD
 export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: string): MainDataRoute | null => {
   const mdText = loadMainDataMarkdownText();
   const routes = parseMainDataMarkdown(mdText);
 
   const qRaw = query.toLowerCase().trim();
   const qNorm = normalizeTextForSearch(query);
+  const qNums = extractNumbersFromString(query);
   if (!qNorm) return null;
 
   for (const route of routes) {
     const landmarkMatch = !startLandmark || normalizeTextForSearch(route.startLandmark).includes(normalizeTextForSearch(startLandmark)) || normalizeTextForSearch(startLandmark).includes(normalizeTextForSearch(route.startLandmark));
     if (!landmarkMatch) continue;
 
-    // Check primary destination and all aliases
     const allAliases = [route.destination, ...route.aliases];
+
     for (const alias of allAliases) {
       const aRaw = alias.toLowerCase().trim();
       const aNorm = normalizeTextForSearch(alias);
+      const aNums = extractNumbersFromString(alias);
 
-      if (
-        aRaw === qRaw ||
-        aNorm === qNorm ||
-        aNorm.includes(qNorm) ||
-        qNorm.includes(aNorm) ||
-        aRaw.includes(qRaw) ||
-        qRaw.includes(aRaw)
-      ) {
+      // 1. Direct or Substring Normalized Match
+      if (aRaw === qRaw || aNorm === qNorm || aNorm.includes(qNorm) || qNorm.includes(aNorm) || aRaw.includes(qRaw) || qRaw.includes(aRaw)) {
         return route;
+      }
+
+      // 2. Numeric Matching (e.g. "f-05" or "room 5" matches "Room F-05")
+      if (qNums.length > 0 && aNums.length > 0) {
+        const hasNumberMatch = qNums.some(num => aNums.includes(num));
+        if (hasNumberMatch) {
+          // Check for category keyword alignment (e.g. "room", "f", "lab", "floor", "stairs")
+          const keywords = ['room', 'f', 'lab', 'stairs', 'floor', 'node'];
+          const qHasKeyword = keywords.some(k => qRaw.includes(k));
+          const aHasKeyword = keywords.some(k => aRaw.includes(k));
+          if (qHasKeyword || aHasKeyword || qNums.length === aNums.length) {
+            return route;
+          }
+        }
+      }
+
+      // 3. Synonym / Intent Keyword Match
+      const intentSynonyms: Record<string, string[]> = {
+        washroom: ['washroom', 'toilet', 'restroom', 'bathroom', 'lavatory', 'wc', 'boys washroom', 'girls washroom'],
+        watercooler: ['watercooler', 'water', 'drinking water', 'cooler', 'filter'],
+        elevator: ['elevator', 'lift'],
+        pantry: ['pantry', 'store', 'storeroom'],
+        mechanical: ['mechanical', 'mech'],
+        datascience: ['data science', 'ds lab', 'ds'],
+        language: ['communication language', 'language lab', 'english lab'],
+        smartapp: ['smart application', 'smart app', 'app lab']
+      };
+
+      for (const [, synonyms] of Object.entries(intentSynonyms)) {
+        const qMatchesKey = synonyms.some(syn => qRaw.includes(syn));
+        const aMatchesKey = synonyms.some(syn => aRaw.includes(syn));
+        if (qMatchesKey && aMatchesKey) {
+          return route;
+        }
       }
     }
   }
