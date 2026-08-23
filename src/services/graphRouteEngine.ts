@@ -15,7 +15,7 @@ export const findNodeByIdOrAlias = (query: string): GraphNode | null => {
     if (node.id.toLowerCase() === normalized || node.name.toLowerCase().includes(normalized)) {
       return node;
     }
-    if (node.aliases.some(a => a.toLowerCase().includes(normalized) || normalized.includes(a.toLowerCase()))) {
+    if (node.aliases.some((a: string) => a.toLowerCase().includes(normalized) || normalized.includes(a.toLowerCase()))) {
       return node;
     }
   }

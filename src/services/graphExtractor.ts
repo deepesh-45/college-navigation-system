@@ -1,4 +1,4 @@
-import { LLM_ROUTES_KNOWLEDGE, LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
+import { LLM_ROUTES_KNOWLEDGE, LLMRouteKnowledge, LLMStepInstruction } from '../data/llmRoutesKnowledge';
 import { GraphNode, GraphEdge } from '../data/campusGraphData';
 
 export interface ExtractedGraph {
@@ -42,7 +42,7 @@ export const extractGraphFromLLMRoutes = (routes: LLMRouteKnowledge[] = LLM_ROUT
     // 3. Extract Intermediate Step Nodes & Edges
     let prevNodeId = startId;
 
-    route.steps.forEach((step, idx) => {
+    route.steps.forEach((step: LLMStepInstruction, idx: number) => {
       const isLastStep = idx === route.steps.length - 1;
       const currNodeId = isLastStep ? destId : step.landmarkHint ? `NODE_${sanitizeId(step.landmarkHint)}` : `NODE_${sanitizeId(route.destinationName)}_STEP_${step.stepNumber}`;
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LLMVoiceCockpit } from './LLMVoiceCockpit';
 import { AdminPortalView } from './AdminPortalView';
 import { VantaBackground } from './VantaBackground';
@@ -8,8 +8,9 @@ import { resolveLLMVoiceQueryAsync } from '../services/llmNavigationEngine';
 import { LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
 import { VoiceState } from '../types';
 import { sensorService } from '../services/sensorService';
+import { CAMPUS_LANDMARKS, CampusLandmark } from '../data/landmarksData';
 
-import { Mic, MicOff, Navigation, Key, ArrowLeft, MapPin, AlertTriangle, CheckCircle2, Sparkles, Compass } from 'lucide-react';
+import { Mic, MicOff, Navigation, Key, ArrowLeft, MapPin, AlertTriangle, CheckCircle2, Sparkles, Compass, Layers } from 'lucide-react';
 
 interface MobileNavigationViewProps {
   userRole: string;
@@ -19,8 +20,11 @@ interface MobileNavigationViewProps {
 export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   onBackToGreeting
 }) => {
-  // Completely blank type-based input fields by default
-  const [startPointInput, setStartPointInput] = useState<string>('');
+  // 1. Floor & Landmark Selection State
+  const [selectedFloor, setSelectedFloor] = useState<number>(1);
+  const [selectedLandmarkId, setSelectedLandmarkId] = useState<string>('landmark_floor_1_main_entrance');
+
+  // Type-Based Destination Input
   const [destinationInput, setDestinationInput] = useState<string>('');
 
   // Active Navigation State
@@ -37,14 +41,29 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   // Admin Portal Modal
   const [showAdminPortal, setShowAdminPortal] = useState<boolean>(false);
 
-  // Handle Start Navigation Button Click (Synthesizes steps directly from corpus for entered start & destination)
+  // Available landmarks for selected floor
+  const floorLandmarks: CampusLandmark[] = CAMPUS_LANDMARKS.filter(l => l.floor === selectedFloor);
+
+  // Active selected landmark object
+  const activeLandmark: CampusLandmark =
+    floorLandmarks.find(l => l.id === selectedLandmarkId) ||
+    floorLandmarks[0] ||
+    CAMPUS_LANDMARKS[0];
+
+  // Update selected landmark default when floor changes
+  useEffect(() => {
+    const defaultForFloor = CAMPUS_LANDMARKS.find(l => l.floor === selectedFloor);
+    if (defaultForFloor) {
+      setSelectedLandmarkId(defaultForFloor.id);
+    }
+  }, [selectedFloor]);
+
+  // Handle Start Navigation Button Click
   const handleStartNavigation = async () => {
     if (!destinationInput.trim()) {
-      alert('Please type or speak a destination location to start navigation!');
+      alert('Please type or speak a destination to start navigation!');
       return;
     }
-
-    const effectiveStartPoint = startPointInput.trim() || 'Main Entrance';
 
     sensorService.resetStepCounter();
     sensorService.triggerHapticFeedback([100]);
@@ -52,17 +71,17 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     setFallbackAlert(null);
     setAmbiguousOptions(null);
 
-    const result = await resolveLLMVoiceQueryAsync(destinationInput.trim(), effectiveStartPoint);
+    const result = await resolveLLMVoiceQueryAsync(destinationInput.trim(), activeLandmark.name);
 
     setIsLoadingRoute(false);
 
     if (result.matched && result.route) {
       setActiveLLMRoute(result.route);
       setIsNavigating(true);
-      const firstStepPrompt = result.route.steps[0]?.voicePrompt || result.route.steps[0]?.instruction || 'Proceed straight';
-      speechService.speak(`Starting navigation from ${result.route.startPoint} to ${result.route.destinationName}. Step 1: ${firstStepPrompt}`);
+      const firstStepPrompt = result.route.steps[0]?.voicePrompt || result.route.steps[0]?.instruction || activeLandmark.facingOrientation;
+      speechService.speak(`Starting navigation from ${activeLandmark.name}. ${firstStepPrompt}`);
     } else {
-      alert(`Could not extract navigation route from ${effectiveStartPoint} to "${destinationInput}". Please check the Admin Panel campus corpus.`);
+      alert(`Could not extract landmark route from ${activeLandmark.name} to "${destinationInput}". Please check the Admin Panel maindata.md.`);
     }
   };
 
@@ -94,16 +113,15 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     );
   };
 
-  // Process Voice Query: Gemini API decodes startPoint and destination from voice, updates inputs, and fetches corpus steps
+  // Process Voice Query
   const handleProcessVoiceQuery = async (query: string) => {
     setVoiceState('processing');
     setIsLoadingRoute(true);
 
-    const result = await resolveLLMVoiceQueryAsync(query, startPointInput.trim() || undefined);
+    const result = await resolveLLMVoiceQueryAsync(query, activeLandmark.name);
     setIsLoadingRoute(false);
 
-    if (result.parsedIntent) {
-      setStartPointInput(result.parsedIntent.startPoint);
+    if (result.parsedIntent && result.parsedIntent.destination) {
       setDestinationInput(result.parsedIntent.destination);
     }
 
@@ -131,7 +149,6 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   const handleConfirmAmbiguousSelection = (route: LLMRouteKnowledge) => {
     setAmbiguousOptions(null);
     setActiveLLMRoute(route);
-    setStartPointInput(route.startPoint);
     setDestinationInput(route.destinationName);
     setIsNavigating(true);
     speechService.speak(`Confirmed selection for ${route.destinationName}. Starting navigation now.`);
@@ -166,42 +183,89 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
         </button>
       </div>
 
-      {/* 1. CLEAN TYPE-BASED INPUT FIELDS (START LOCATION & DESTINATION) */}
+      {/* 1. FLOOR & LANDMARK SELECTOR PANEL */}
       <div className="p-2.5 sm:p-3 rounded-2xl bg-white border border-slate-200 shadow space-y-2 z-10">
-        <div className="grid grid-cols-2 gap-2">
-          {/* Start Point Type-Based Text Input */}
-          <div>
-            <label className="text-[9px] font-extrabold uppercase text-slate-500 block mb-0.5 truncate">
-              Start Location:
-            </label>
-            <input
-              type="text"
-              value={startPointInput}
-              onChange={(e) => {
-                setStartPointInput(e.target.value);
+        
+        {/* Floor Selection Pills */}
+        <div>
+          <label className="text-[9px] font-extrabold uppercase text-slate-500 flex items-center gap-1 mb-1">
+            <Layers className="w-3 h-3 text-[#1d4ed8]" />
+            Select Floor:
+          </label>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => {
+                setSelectedFloor(1);
                 setIsNavigating(false);
               }}
-              placeholder="e.g. Main Entrance"
-              className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8] truncate"
-            />
+              className={`py-1.5 px-2 rounded-xl text-[11px] font-black transition-all ${
+                selectedFloor === 1
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              Ground Floor (Floor 1)
+            </button>
+            <button
+              onClick={() => {
+                setSelectedFloor(2);
+                setIsNavigating(false);
+              }}
+              className={`py-1.5 px-2 rounded-xl text-[11px] font-black transition-all ${
+                selectedFloor === 2
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              First Floor (Floor 2)
+            </button>
           </div>
+        </div>
 
-          {/* Destination Type-Based Text Input */}
-          <div>
-            <label className="text-[9px] font-extrabold uppercase text-slate-500 block mb-0.5 truncate">
-              Destination:
-            </label>
-            <input
-              type="text"
-              value={destinationInput}
-              onChange={(e) => {
-                setDestinationInput(e.target.value);
-                setIsNavigating(false);
-              }}
-              placeholder="e.g. Data Science Lab"
-              className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8] truncate"
-            />
+        {/* Landmark Dropdown Selector for Selected Floor */}
+        <div>
+          <label className="text-[9px] font-extrabold uppercase text-slate-500 flex items-center gap-1 mb-0.5">
+            <Compass className="w-3 h-3 text-amber-500" />
+            Starting Landmark:
+          </label>
+          <select
+            value={selectedLandmarkId}
+            onChange={(e) => {
+              setSelectedLandmarkId(e.target.value);
+              setIsNavigating(false);
+            }}
+            className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8]"
+          >
+            {floorLandmarks.map((l) => (
+              <option key={l.id} value={l.id}>
+                📍 {l.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Selected Landmark Position & Facing Card */}
+        {activeLandmark && (
+          <div className="p-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-[10px] font-bold shadow-sm">
+            <span>🧭 <strong>Facing Rule</strong>: "{activeLandmark.facingOrientation}"</span>
           </div>
+        )}
+
+        {/* Destination Type-Based Input */}
+        <div>
+          <label className="text-[9px] font-extrabold uppercase text-slate-500 block mb-0.5">
+            Destination:
+          </label>
+          <input
+            type="text"
+            value={destinationInput}
+            onChange={(e) => {
+              setDestinationInput(e.target.value);
+              setIsNavigating(false);
+            }}
+            placeholder="e.g. Data Science Lab, Washroom, AI Lab"
+            className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8] truncate"
+          />
         </div>
 
         {/* Voice Transcript Display */}
@@ -212,7 +276,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
         )}
 
         {/* ACTION BUTTONS: Mic Voice Input & Start Navigation */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pt-0.5">
           <button
             onClick={handleMicClick}
             className={`p-2 rounded-xl border font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-sm active:scale-95 ${
@@ -288,9 +352,9 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
               <Compass className="w-7 h-7" />
             </div>
             <div>
-              <h4 className="font-l2 text-sm font-black text-slate-800">Ready for Navigation</h4>
+              <h4 className="font-l2 text-sm font-black text-slate-800">Ready for Landmark Navigation</h4>
               <p className="text-[11px] font-semibold text-slate-500 max-w-xs mt-1">
-                Type or speak your destination (e.g. "Data Science Lab", "Washroom"), then tap <strong className="text-blue-600">Start Navigation ➔</strong>.
+                Select your floor & landmark, type or speak your destination (e.g. "Data Science Lab"), then tap <strong className="text-blue-600">Start Navigation ➔</strong>.
               </p>
             </div>
           </div>
@@ -301,20 +365,15 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
       {showAdminPortal && (
         <AdminPortalView
           onClose={() => setShowAdminPortal(false)}
-          onRouteAdded={(newRoute) => {
-            if (newRoute) {
-              setActiveLLMRoute(newRoute);
-              setStartPointInput(newRoute.startPoint);
-              setDestinationInput(newRoute.destinationName);
-              setIsNavigating(true);
-            }
+          onRouteAdded={() => {
+            setIsNavigating(false);
           }}
         />
       )}
 
       {/* Compact Single-Screen Footer */}
       <footer className="p-1.5 bg-white/80 backdrop-blur-md rounded-xl border border-slate-200 text-center text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-wider z-10">
-        Smart Campus AI Navigation • Clear Inputs & Direct Corpus Engine
+        Smart Campus AI Navigation • Landmark Selector & Dedicated Gemini Engine
       </footer>
     </div>
   );
