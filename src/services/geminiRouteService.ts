@@ -1,6 +1,6 @@
 import { LLMRouteKnowledge, LLMStepInstruction } from '../data/llmRoutesKnowledge';
-import { GROUND_FLOOR_CORPUS, FIRST_FLOOR_CORPUS } from '../data/corpuses';
 import { CAMPUS_LANDMARKS, findLandmarkByNameOrAlias, getAnchorLandmarkForFloor } from '../data/landmarksData';
+import { loadMainDataMarkdownText } from '../data/maindataService';
 
 export interface ParsedVoiceIntent {
   startPoint: string;
@@ -96,19 +96,16 @@ export const generateRouteDirectlyFromCorpus = async (
 
   const matchedLandmark = findLandmarkByNameOrAlias(startPoint) || getAnchorLandmarkForFloor(1);
   const facingOrientation = matchedLandmark.facingOrientation;
+  const mainDataMdText = loadMainDataMarkdownText();
 
   const systemPrompt = `You are a Smart Campus Navigation AI Engine.
-Analyze the raw spoken campus walk corpuses and generate a step-by-step navigation route from "${matchedLandmark.name}" to "${destinationQuery}".
+Analyze the maindata.md landmark routes and generate a step-by-step navigation route from "${matchedLandmark.name}" to "${destinationQuery}".
 
 STARTING LANDMARK ORIENTATION INSTRUCTION:
 "${facingOrientation}"
 
-RAW CAMPUS CORPUSES:
-[GROUND FLOOR (FLOOR 1)]:
-${GROUND_FLOOR_CORPUS}
-
-[FIRST FLOOR (FLOOR 2)]:
-${FIRST_FLOOR_CORPUS}
+LIVE MAINDATA.MD LANDMARK ROUTES:
+${mainDataMdText}
 
 CRITICAL SIMPLE ATOMIC STEP RULE:
 Keep each step simple and ONE work/action at a time! Do NOT combine walking, turning, or stair climbing into a single step.
