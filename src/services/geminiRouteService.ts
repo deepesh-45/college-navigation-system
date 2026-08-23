@@ -1,6 +1,7 @@
 import { LLMRouteKnowledge } from '../types';
 import { findLandmarkByNameOrAlias, getAnchorLandmarkForFloor } from '../data/landmarksData';
 import { loadMainDataMarkdownText, findMainDataRouteFromMarkdown, convertMainDataToLLMRoute } from '../data/maindataService';
+import { buildGeminiNavigationSystemPrompt, buildGeminiVoiceIntentSystemPrompt } from '../prompts/geminiNavigationPrompt';
 
 export interface ParsedVoiceIntent {
   startPoint: string;
@@ -22,21 +23,7 @@ export const parseVoiceIntentWithGemini = async (
   const { primary, fallback } = getGeminiApiKeys();
   const apiKeysToTry = [primary, fallback].filter(k => k && !k.includes('DemoApiKey'));
 
-  const systemPrompt = `You are a Smart Campus Voice Intent Parser.
-Extract the starting location and destination from the user's spoken voice query.
-If the starting location is not explicitly mentioned by the user, default startPoint to "Main Entrance".
-
-Available Campus Anchor Landmarks:
-- Ground Floor (Floor 1): "Main Entrance" (Orientation: Face the same way as you enter through the main entrance)
-- First Floor (Floor 2): "Stair Landing" (Orientation: Face towards the wall at the end of the staircase)
-
-User Spoken Query: "${userVoiceQuery}"
-
-Return strictly raw valid JSON (no markdown formatting around json):
-{
-  "startPoint": "Extracted Start Location or Main Entrance",
-  "destination": "Extracted Destination Location"
-}`;
+  const systemPrompt = buildGeminiVoiceIntentSystemPrompt(userVoiceQuery);
 
   for (const apiKey of apiKeysToTry) {
     try {
@@ -104,57 +91,14 @@ export const generateRouteDirectlyFromCorpus = async (
   const facingOrientation = matchedLandmark.facingOrientation;
   const mainDataMdText = loadMainDataMarkdownText();
 
-  const systemPrompt = `You are the Master Smart Campus AI Navigation Engine.
-Extract the route matching Starting Landmark "${matchedLandmark.name}" and Destination "${destinationQuery}" STRICTLY from maindata.md.
-
-STARTING LANDMARK ORIENTATION INSTRUCTION:
-"${facingOrientation}"
-
-LIVE MAINDATA.MD LANDMARK ROUTES:
-${mainDataMdText}
-
-CRITICAL RULES:
-1. Use ONLY the paths defined in maindata.md. If the destination "${destinationQuery}" is NOT present in maindata.md, return JSON {"error": "Path not found in maindata.md"}.
-2. Step 1 MUST be the Landmark Facing Orientation Instruction:
-   "instruction": "${facingOrientation}"
-3. Subsequent steps MUST be simple single actions (ONE action per step):
-   - Walk step: "Move straight [N] steps." / "Move [N] steps."
-   - Turn step: "Move left." / "Move right."
-   - Stair step: "Take stairs up." / "Take stairs down."
-   - Arrival step: "Destination reached (${destinationQuery})."
-
-Return strictly raw valid JSON (no markdown formatting around json):
-{
-  "id": "ROUTE_DYNAMIC_CORPUS_${Date.now()}",
-  "category": "lab|classroom|cabin|washroom|watercooler|auditorium|library|canteen|facility",
-  "destinationName": "${destinationQuery}",
-  "aliases": ["${destinationQuery.toLowerCase()}"],
-  "startPoint": "${matchedLandmark.name}",
-  "facingOrientation": "${facingOrientation}",
-  "building": "Main Campus",
-  "floor": ${matchedLandmark.floor},
-  "totalSteps": 35,
-  "totalDistanceMeters": 26,
-  "overviewSummary": "Landmark navigation from ${matchedLandmark.name} to ${destinationQuery}.",
-  "steps": [
-    {
-      "stepNumber": 1,
-      "instruction": "${facingOrientation}",
-      "headingDegrees": 0,
-      "headingText": "orient",
-      "stepsCount": 0,
-      "voicePrompt": "${facingOrientation}"
-    },
-    {
-      "stepNumber": 2,
-      "instruction": "Move straight 15 steps.",
-      "headingDegrees": 0,
-      "headingText": "straight",
-      "stepsCount": 15,
-      "voicePrompt": "Move straight 15 steps."
-    }
-  ]
-}`;
+  // 2. Build Dedicated Gemini System Prompt from separate prompt file
+  const systemPrompt = buildGeminiNavigationSystemPrompt({
+    startLandmarkName: matchedLandmark.name,
+    facingOrientation,
+    destinationQuery,
+    mainDataMdText,
+    selectedFloor: matchedLandmark.floor
+  });
 
   for (const apiKey of apiKeysToTry) {
     try {
