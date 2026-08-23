@@ -145,10 +145,15 @@ Our solution follows a **B2B SaaS Freemium Model** targeted at educational insti
 
 ---
 
-## 8. Thank You
+## 8. Team & Acknowledgments
+
+### 👥 Team Members:
+* **Deepesh Patel**
+* **Jatin Karma**
+* **Anushka Dubey**
+* **Divya Verma**
 
 Thank you for exploring the **Smart Campus Navigation System**!
 
 * 🌐 **Live Web App**: [https://deepesh-45.github.io/college-navigation-system/](https://deepesh-45.github.io/college-navigation-system/)
 * 📂 **GitHub Repository**: [https://github.com/deepesh-45/college-navigation-system](https://github.com/deepesh-45/college-navigation-system)
-* 📬 **Contact**: Deepesh Patel — Lead Developer
