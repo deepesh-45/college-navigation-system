@@ -1,6 +1,6 @@
 # Smart Campus Main Landmark Data
 
-<!-- Format per line: Landmark to Destination - Path -->
+<!-- Format per line: Landmark to Destination (it can be multiple destinations with same path combined by 'or' or 'and', also there may be extra descriptive words) - Path -->
 Main Entrance to Stairs first floor to second floor - Move straight 15steps . You will get a junction . Turn left and walk 15 steps . On the right there is destination.
 Stair Landing to Stairs 2nd floor to 3rd floor - Just at the end of 1st floor stairs . Where you are standing exact same .
 Stair Landing to Room F-01 - Just infront of you

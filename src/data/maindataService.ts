@@ -144,8 +144,8 @@ export const parseMainDataMarkdown = (mdText: string): MainDataRoute[] => {
     const startLandmark = headerSplit[0].trim();
     const destinationRaw = headerSplit[1].trim();
 
-    // Extract aliases if destination is separated by ' or '
-    const aliases = destinationRaw.split(/\s+or\s+/i).map(a => a.trim()).filter(Boolean);
+    // Extract aliases if destination is separated by 'or' or 'and'
+    const aliases = destinationRaw.split(/\s+(?:or|and)\s+/i).map(a => a.trim()).filter(Boolean);
     const primaryDestination = aliases[0] || destinationRaw;
 
     const landmarkObj = findLandmarkByNameOrAlias(startLandmark);

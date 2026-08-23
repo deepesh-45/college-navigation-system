@@ -169,7 +169,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose, onRou
               Admin Portal — Live `maindata.md` Landmark Editor
             </h2>
             <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-              Format: <strong className="text-amber-400">Landmark to Destination - Path</strong>
+              Format: <strong className="text-amber-400">Landmark to Destination (combined by 'or' / 'and') - Path</strong>
             </p>
           </div>
         </div>
