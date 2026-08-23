@@ -1,10 +1,18 @@
 /**
- * Dedicated System Prompt Builder for Smart Campus AI Navigation Engine
+ * Dedicated System Prompt Builders for Smart Campus AI Navigation Engine
  * 
- * Focuses on USER INTENT & NUMERIC/KEYWORD MATCHING over exact string equality!
+ * Flow:
+ * Stage 1: Destination Intent Extraction & Path Existence Validation (`nodes.md`)
+ * Stage 2: Atomic Navigation Step Generation (`maindata.md`)
  */
 
-export interface PromptInputParams {
+export interface DestinationExtractorParams {
+  userQuery: string;
+  nodesMdText: string;
+  selectedLandmarkName: string;
+}
+
+export interface NavigationStepGeneratorParams {
   startLandmarkName: string;
   facingOrientation: string;
   destinationQuery: string;
@@ -13,41 +21,101 @@ export interface PromptInputParams {
 }
 
 /**
- * Builds the dedicated system prompt sent to Gemini AI API for step extraction
+ * STAGE 1 DEDICATED PROMPT:
+ * Extracts Destination Intent from User Query and Checks `nodes.md` to Verify Path Existence!
  */
-export const buildGeminiNavigationSystemPrompt = (params: PromptInputParams): string => {
+export const buildGeminiDestinationExtractorAndValidatorPrompt = (params: DestinationExtractorParams): string => {
+  const { userQuery, nodesMdText, selectedLandmarkName } = params;
+
+  return `================================================================================
+SMART CAMPUS INTENT EXTRACTOR & PATH VALIDATOR SYSTEM PROMPT
+================================================================================
+You are the Master Smart Campus AI Spatial Intent Extractor & Path Validator.
+Your job is to analyze the user's spoken or typed natural language query, extract the exact target destination intent, and cross-examine the live "nodes.md" registry to check whether a mapped destination path exists for this destination.
+
+--------------------------------------------------------------------------------
+1. INPUT CONTEXT & ENVIRONMENT DATA
+--------------------------------------------------------------------------------
+- USER NATURAL LANGUAGE QUERY: "${userQuery}"
+- CURRENT STARTING LANDMARK: "${selectedLandmarkName}"
+
+- LIVE MAPPED NODES & DESTINATIONS REGISTRY ("nodes.md"):
+${nodesMdText}
+
+--------------------------------------------------------------------------------
+2. INTENT EXTRACTION & ALIAS MATCHING GUIDELINES
+--------------------------------------------------------------------------------
+- Extract the core destination entity intended by the user, ignoring conversational filler words like "take me to", "where is", "how to go to", "show path to", "i want to find", etc.
+- Perform flexible intent & numeric matching against the mapped entries in "nodes.md":
+  * "washroom" / "toilet" / "restroom" / "wc" / "bathroom" -> Matches "Watercooler / Boys Washroom / Girls Washroom"
+  * "water" / "watercooler" / "drinking water" -> Matches "Watercooler / Boys Washroom / Girls Washroom"
+  * "f05" / "f-05" / "room 5" / "smart app" -> Matches "Room F-05 / Smart Application Development Lab"
+  * "ds lab" / "data science" / "language lab" / "f09" / "f08" -> Matches "Room F-08 / Room F-09 / Communication Language Lab / Data Science Lab"
+  * "lift" / "elevator" -> Matches "Elevator / Lift First Floor"
+  * "pantry" / "store" -> Matches "Store / Pantry Room"
+  * "mech" / "mechanical" -> Matches "Mechanical Engineering Department"
+  * "stairs" / "staircase" -> Matches "Stairs first floor to second floor" / "Stairs 2nd floor to 3rd floor"
+
+--------------------------------------------------------------------------------
+3. VALIDATION & DECISION LOGIC
+--------------------------------------------------------------------------------
+- Set "pathExists" to true IF AND ONLY IF the extracted destination matches an entry or synonym in "nodes.md".
+- If the destination is NOT listed or mapped in "nodes.md", set "pathExists" to false.
+
+--------------------------------------------------------------------------------
+4. MANDATORY RAW JSON OUTPUT FORMAT
+--------------------------------------------------------------------------------
+Return STRICTLY raw valid JSON (no markdown formatting around json):
+
+{
+  "extractedDestination": "Data Science Lab",
+  "matchedNodeInNodesMd": "Room F-08 / Room F-09 / Communication Language Lab / Data Science Lab",
+  "pathExists": true,
+  "explanation": "Successfully extracted 'Data Science Lab' from user query and verified path exists in nodes.md."
+}`;
+};
+
+/**
+ * STAGE 2 DEDICATED PROMPT:
+ * Generates Atomic Navigation Steps from `maindata.md` with Landmark Orientation Step 1!
+ */
+export const buildGeminiNavigationSystemPrompt = (params: NavigationStepGeneratorParams): string => {
   const { startLandmarkName, facingOrientation, destinationQuery, mainDataMdText, selectedFloor = 1 } = params;
 
-  return `You are the Master Smart Campus AI Navigation Engine.
-Parse maindata.md and extract the navigation path matching Starting Landmark "${startLandmarkName}" and Destination Intent "${destinationQuery}".
+  return `================================================================================
+SMART CAMPUS ATOMIC STEP NAVIGATION GENERATOR PROMPT
+================================================================================
+You are the Master Smart Campus AI Navigation Step Generator.
+Your job is to parse the live "maindata.md" database and generate a step-by-step navigation route from Starting Landmark "${startLandmarkName}" to Destination "${destinationQuery}".
 
-STARTING LANDMARK ORIENTATION INSTRUCTION:
-"${facingOrientation}"
+--------------------------------------------------------------------------------
+1. INPUT DATA & ENVIRONMENT
+--------------------------------------------------------------------------------
+- STARTING LANDMARK: "${startLandmarkName}"
+- STARTING FACING ORIENTATION RULE: "${facingOrientation}"
+- TARGET DESTINATION: "${destinationQuery}"
 
-LIVE MAINDATA.MD LANDMARK ROUTES (SINGLE SOURCE OF TRUTH):
+- LIVE MAINDATA.MD LANDMARK ROUTE DATABASE (SINGLE SOURCE OF TRUTH):
 ${mainDataMdText}
 
-CRITICAL INTENT & NUMERIC MATCHING RULES:
-1. DO NOT require an exact string match! Focus on USER INTENT and NUMERIC/KEYWORD MATCHING:
-   - "washroom" / "toilet" / "restroom" -> matches "Watercooler or Boys washroom First floor or Girls washroom First Floor"
-   - "water" / "watercooler" / "drinking water" -> matches "Watercooler or Boys washroom First floor or Girls washroom First Floor"
-   - "f-05" / "f05" / "room 5" / "smart app" -> matches "Room F-05 or Smart application development Lab"
-   - "ds lab" / "data science" / "language lab" / "f09" / "f08" -> matches "Communication Language Lab or Data Science Lab or Room F-09 F-08 or Room"
-   - "lift" / "elevator" -> matches "Elevator First Floor or Lift First floor"
-   - "pantry" / "store" -> matches "Store/Pantry room"
-   - "mechanical" / "mech dept" -> matches "Mechanical Engineering Department"
-2. If no matching entry exists in maindata.md for the intent of "${destinationQuery}", return JSON: {"error": "Path not found in maindata.md"}.
-3. Step 1 MUST be the Landmark Facing Orientation Instruction:
+--------------------------------------------------------------------------------
+2. CRITICAL ATOMIC STEP DECOMPOSITION RULES
+--------------------------------------------------------------------------------
+1. Step 1 MUST be the Landmark Facing Orientation Instruction:
    "instruction": "${facingOrientation}"
-4. Subsequent steps MUST be simple atomic single actions (ONE action per step):
+2. Subsequent steps MUST be simple atomic single actions (ONE action per step):
    - Walk step: "Move straight [N] steps." / "Move [N] steps."
    - Turn step: "Move left." / "Move right."
    - Stair step: "Take stairs up." / "Take stairs down."
    - Arrival step: "Destination reached (${destinationQuery})."
 
-Return strictly raw valid JSON (no markdown formatting around json):
+--------------------------------------------------------------------------------
+3. MANDATORY RAW JSON OUTPUT FORMAT
+--------------------------------------------------------------------------------
+Return STRICTLY raw valid JSON (no markdown formatting around json):
+
 {
-  "id": "ROUTE_DYNAMIC_CORPUS_${Date.now()}",
+  "id": "ROUTE_DYNAMIC_${Date.now()}",
   "category": "lab|classroom|cabin|washroom|watercooler|auditorium|library|canteen|facility",
   "destinationName": "${destinationQuery}",
   "aliases": ["${destinationQuery.toLowerCase()}"],
