@@ -81,7 +81,7 @@ Return strictly raw valid JSON (no markdown formatting around json):
   };
 };
 
-// Generate Step-by-Step Navigation Directly from Raw Spoken Corpuses (User Start Point -> Destination)
+// Generate Step-by-Step Navigation Directly from Raw Spoken Corpuses (Simple Atomic Single-Action Steps)
 export const generateRouteDirectlyFromCorpus = async (
   destinationQuery: string,
   startPoint: string = 'Main Entrance'
@@ -90,7 +90,7 @@ export const generateRouteDirectlyFromCorpus = async (
   const apiKeysToTry = [primary, fallback].filter(k => k && !k.includes('DemoApiKey'));
 
   const systemPrompt = `You are a Smart Campus Navigation AI Engine.
-Analyze the following raw spoken campus walk corpuses and generate a step-by-step navigation route from the starting location "${startPoint}" to the requested destination "${destinationQuery}".
+Analyze the following raw spoken campus walk corpuses and generate a step-by-step navigation route from "${startPoint}" to "${destinationQuery}".
 
 RAW CAMPUS CORPUSES:
 [GROUND FLOOR (FLOOR 1)]:
@@ -99,16 +99,16 @@ ${GROUND_FLOOR_CORPUS}
 [FIRST FLOOR (FLOOR 2)]:
 ${FIRST_FLOOR_CORPUS}
 
-RULES:
-1. Carefully analyze the corpuses to locate the starting point "${startPoint}" and destination "${destinationQuery}".
-2. Extract the required number of steps, directional turns (turn left, turn right, continue straight), and floor transitions via stairs/elevators between "${startPoint}" and "${destinationQuery}".
-3. Format EVERY step instruction strictly as:
-   "Move straight approx [N] steps and [turn left / turn right / continue straight / take stairs up / take stairs down / reach destination]."
-4. Calculate totalSteps by summing stepsCount across all steps.
-5. Calculate totalDistanceMeters as Math.round(totalSteps * 0.75).
-6. Set startPoint to "${startPoint}" and destinationName to "${destinationQuery}".
-7. Return strictly raw valid JSON (no markdown formatting around json) conforming to this structure:
+CRITICAL SIMPLE ATOMIC STEP RULE:
+Keep each step simple and ONE work/action at a time! Do NOT combine walking, turning, or stair climbing into a single step.
+Format step instructions as simple atomic single actions:
+- Walk step: "Move straight approx [N] steps."
+- Turn step: "Turn left." or "Turn right."
+- Stair step: "Take stairs up." or "Take stairs down."
+- Elevator step: "Take elevator."
+- Arrival step: "Reach ${destinationQuery}."
 
+Return strictly raw valid JSON (no markdown formatting around json):
 {
   "id": "ROUTE_DYNAMIC_CORPUS_${Date.now()}",
   "category": "lab|classroom|cabin|washroom|watercooler|auditorium|library|canteen|facility",
@@ -119,15 +119,23 @@ RULES:
   "floor": 1,
   "totalSteps": 35,
   "totalDistanceMeters": 26,
-  "overviewSummary": "Direct navigation route from ${startPoint} to ${destinationQuery} synthesized from campus corpus.",
+  "overviewSummary": "Direct atomic step navigation from ${startPoint} to ${destinationQuery}.",
   "steps": [
     {
       "stepNumber": 1,
-      "instruction": "Move straight approx 15 steps and continue straight.",
+      "instruction": "Move straight approx 15 steps.",
       "headingDegrees": 0,
-      "headingText": "continue straight",
+      "headingText": "straight",
       "stepsCount": 15,
-      "voicePrompt": "Move straight approx 15 steps and continue straight."
+      "voicePrompt": "Move straight approx 15 steps."
+    },
+    {
+      "stepNumber": 2,
+      "instruction": "Turn left.",
+      "headingDegrees": 270,
+      "headingText": "turn left",
+      "stepsCount": 0,
+      "voicePrompt": "Turn left."
     }
   ]
 }`;
@@ -150,16 +158,16 @@ RULES:
         return parsed as LLMRouteKnowledge;
       }
     } catch (err) {
-      console.warn('Gemini API Key attempt notice, using local corpus path builder:', err);
+      console.warn('Gemini API Key attempt notice, using local atomic corpus path builder:', err);
     }
   }
 
-  // Pure Deterministic Corpus Graph & Route Generator Fallback
-  return generateLocalCorpusPath(destinationQuery, startPoint);
+  // Pure Deterministic Atomic Single-Action Corpus Path Builder Fallback
+  return generateLocalCorpusAtomicPath(destinationQuery, startPoint);
 };
 
-// Deterministic Corpus Path Builder based on exact sentences in GROUND_FLOOR_CORPUS & FIRST_FLOOR_CORPUS
-const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKnowledge => {
+// Deterministic Atomic Single-Action Corpus Path Builder (ONE action per step)
+const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMRouteKnowledge => {
   const destLower = destination.toLowerCase();
   const startName = start.trim() || 'Main Entrance';
 
@@ -168,179 +176,304 @@ const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKn
   let floor = 1;
   let category: LLMRouteKnowledge['category'] = 'facility';
 
-  // Ground Floor Corpus Steps
-  const stepMainToJunction: LLMStepInstruction = {
+  // Atomic Single-Action Steps Definitions
+  const stepWalkToJunction: LLMStepInstruction = {
     stepNumber: 1,
-    instruction: `Move straight approx 15 steps from ${startName} to reach hallway junction.`,
+    instruction: `Move straight approx 15 steps from ${startName} to hallway junction.`,
     headingDegrees: 0,
-    headingText: "continue straight",
+    headingText: "straight",
     stepsCount: 15,
-    voicePrompt: `Move straight approx 15 steps from ${startName} to reach hallway junction.`
+    voicePrompt: `Move straight approx 15 steps from ${startName} to hallway junction.`
   };
 
-  const stepJunctionToStairs: LLMStepInstruction = {
+  const stepTurnLeftJunction: LLMStepInstruction = {
     stepNumber: 2,
-    instruction: "Move straight approx 14 steps and turn left to reach staircase.",
+    instruction: "Turn left.",
     headingDegrees: 270,
     headingText: "turn left",
-    stepsCount: 14,
-    voicePrompt: "Move straight approx 14 steps and turn left to reach staircase."
+    stepsCount: 0,
+    voicePrompt: "Turn left."
   };
 
-  const stepStairsToElevator: LLMStepInstruction = {
+  const stepWalkToStairs: LLMStepInstruction = {
     stepNumber: 3,
+    instruction: "Move straight approx 14 steps to reach staircase.",
+    headingDegrees: 0,
+    headingText: "straight",
+    stepsCount: 14,
+    voicePrompt: "Move straight approx 14 steps to reach staircase."
+  };
+
+  const stepWalkToElevator: LLMStepInstruction = {
+    stepNumber: 4,
     instruction: "Move straight approx 20 steps to reach elevator.",
     headingDegrees: 0,
-    headingText: "continue straight",
+    headingText: "straight",
     stepsCount: 20,
     voicePrompt: "Move straight approx 20 steps to reach elevator."
   };
 
-  const stepElevatorToNode5: LLMStepInstruction = {
-    stepNumber: 4,
-    instruction: "Move straight approx 5 steps to reach Node 5 facility.",
-    headingDegrees: 0,
-    headingText: "continue straight",
-    stepsCount: 5,
-    voicePrompt: "Move straight approx 5 steps to reach Node 5 facility."
-  };
-
-  const stepNode5ToNode6: LLMStepInstruction = {
+  const stepWalkToNode5: LLMStepInstruction = {
     stepNumber: 5,
-    instruction: "Move straight approx 20 steps to reach Node 6 facility.",
+    instruction: "Move straight approx 5 steps.",
     headingDegrees: 0,
-    headingText: "continue straight",
+    headingText: "straight",
+    stepsCount: 5,
+    voicePrompt: "Move straight approx 5 steps."
+  };
+
+  const stepArriveNode5: LLMStepInstruction = {
+    stepNumber: 6,
+    instruction: "Reach Node 5 facility.",
+    headingDegrees: 0,
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach Node 5 facility."
+  };
+
+  const stepWalkToNode6: LLMStepInstruction = {
+    stepNumber: 6,
+    instruction: "Move straight approx 20 steps.",
+    headingDegrees: 0,
+    headingText: "straight",
     stepsCount: 20,
-    voicePrompt: "Move straight approx 20 steps to reach Node 6 facility."
+    voicePrompt: "Move straight approx 20 steps."
   };
 
-  const stepStairsToDSLab: LLMStepInstruction = {
-    stepNumber: 3,
-    instruction: "Move straight approx 10 steps to reach Data Science Lab.",
+  const stepArriveNode6: LLMStepInstruction = {
+    stepNumber: 7,
+    instruction: "Reach Node 6 facility.",
     headingDegrees: 0,
-    headingText: "continue straight",
-    stepsCount: 10,
-    voicePrompt: "Move straight approx 10 steps to reach Data Science Lab."
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach Node 6 facility."
   };
 
-  const stepDSLabToNode8: LLMStepInstruction = {
+  const stepWalkToDSLab: LLMStepInstruction = {
     stepNumber: 4,
-    instruction: "Move straight approx 20 steps and turn left to reach Node 8 facility.",
+    instruction: "Move straight approx 10 steps.",
+    headingDegrees: 0,
+    headingText: "straight",
+    stepsCount: 10,
+    voicePrompt: "Move straight approx 10 steps."
+  };
+
+  const stepArriveDSLab: LLMStepInstruction = {
+    stepNumber: 5,
+    instruction: "Reach Data Science Lab.",
+    headingDegrees: 0,
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach Data Science Lab."
+  };
+
+  const stepTurnLeftDSLab: LLMStepInstruction = {
+    stepNumber: 5,
+    instruction: "Turn left.",
     headingDegrees: 270,
     headingText: "turn left",
-    stepsCount: 20,
-    voicePrompt: "Move straight approx 20 steps and turn left to reach Node 8 facility."
+    stepsCount: 0,
+    voicePrompt: "Turn left."
   };
 
-  // First Floor Corpus Steps
-  const stepStairsUpToFirstFloor: LLMStepInstruction = {
-    stepNumber: 3,
-    instruction: "Move straight approx 20 steps and take stairs up to First Floor.",
+  const stepWalkToNode8: LLMStepInstruction = {
+    stepNumber: 6,
+    instruction: "Move straight approx 20 steps.",
+    headingDegrees: 0,
+    headingText: "straight",
+    stepsCount: 20,
+    voicePrompt: "Move straight approx 20 steps."
+  };
+
+  const stepArriveNode8: LLMStepInstruction = {
+    stepNumber: 7,
+    instruction: "Reach Node 8 facility.",
+    headingDegrees: 0,
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach Node 8 facility."
+  };
+
+  // First Floor Atomic Steps
+  const stepClimbStairs: LLMStepInstruction = {
+    stepNumber: 4,
+    instruction: "Take stairs up to First Floor.",
     headingDegrees: 0,
     headingText: "take stairs up",
     stepsCount: 20,
-    voicePrompt: "Move straight approx 20 steps and take stairs up to First Floor."
+    voicePrompt: "Take stairs up to First Floor."
   };
 
-  const stepToAuditorium: LLMStepInstruction = {
-    stepNumber: 4,
-    instruction: "Move straight approx 10 steps to reach Main Auditorium.",
-    headingDegrees: 0,
-    headingText: "continue straight",
-    stepsCount: 10,
-    voicePrompt: "Move straight approx 10 steps to reach Main Auditorium."
-  };
-
-  const stepToAILab: LLMStepInstruction = {
+  const stepWalkToAuditorium: LLMStepInstruction = {
     stepNumber: 5,
-    instruction: "Move straight approx 25 steps and turn right to reach AI Research Center.",
+    instruction: "Move straight approx 10 steps.",
+    headingDegrees: 0,
+    headingText: "straight",
+    stepsCount: 10,
+    voicePrompt: "Move straight approx 10 steps."
+  };
+
+  const stepArriveAuditorium: LLMStepInstruction = {
+    stepNumber: 6,
+    instruction: "Reach Main Auditorium.",
+    headingDegrees: 0,
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach Main Auditorium."
+  };
+
+  const stepTurnRightAuditorium: LLMStepInstruction = {
+    stepNumber: 6,
+    instruction: "Turn right.",
     headingDegrees: 90,
     headingText: "turn right",
-    stepsCount: 25,
-    voicePrompt: "Move straight approx 25 steps and turn right to reach AI Research Center."
+    stepsCount: 0,
+    voicePrompt: "Turn right."
   };
 
-  const stepToLibrary: LLMStepInstruction = {
-    stepNumber: 6,
-    instruction: "Move straight approx 15 steps to reach Central Library.",
-    headingDegrees: 0,
-    headingText: "continue straight",
-    stepsCount: 15,
-    voicePrompt: "Move straight approx 15 steps to reach Central Library."
-  };
-
-  const stepToCabins: LLMStepInstruction = {
+  const stepWalkToAILab: LLMStepInstruction = {
     stepNumber: 7,
-    instruction: "Move straight approx 12 steps and turn left to reach Faculty Cabins.",
+    instruction: "Move straight approx 25 steps.",
+    headingDegrees: 0,
+    headingText: "straight",
+    stepsCount: 25,
+    voicePrompt: "Move straight approx 25 steps."
+  };
+
+  const stepArriveAILab: LLMStepInstruction = {
+    stepNumber: 8,
+    instruction: "Reach AI Research Center.",
+    headingDegrees: 0,
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach AI Research Center."
+  };
+
+  const stepWalkToLibrary: LLMStepInstruction = {
+    stepNumber: 8,
+    instruction: "Move straight approx 15 steps.",
+    headingDegrees: 0,
+    headingText: "straight",
+    stepsCount: 15,
+    voicePrompt: "Move straight approx 15 steps."
+  };
+
+  const stepArriveLibrary: LLMStepInstruction = {
+    stepNumber: 9,
+    instruction: "Reach Central Library.",
+    headingDegrees: 0,
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach Central Library."
+  };
+
+  const stepTurnLeftLibrary: LLMStepInstruction = {
+    stepNumber: 9,
+    instruction: "Turn left.",
     headingDegrees: 270,
     headingText: "turn left",
-    stepsCount: 12,
-    voicePrompt: "Move straight approx 12 steps and turn left to reach Faculty Cabins."
+    stepsCount: 0,
+    voicePrompt: "Turn left."
   };
 
-  const stepToWashroom: LLMStepInstruction = {
-    stepNumber: 8,
-    instruction: "Move straight approx 8 steps to reach Washroom.",
+  const stepWalkToCabins: LLMStepInstruction = {
+    stepNumber: 10,
+    instruction: "Move straight approx 12 steps.",
     headingDegrees: 0,
-    headingText: "continue straight",
-    stepsCount: 8,
-    voicePrompt: "Move straight approx 8 steps to reach Washroom."
+    headingText: "straight",
+    stepsCount: 12,
+    voicePrompt: "Move straight approx 12 steps."
   };
 
-  // Build Route based on Destination Query
+  const stepArriveCabins: LLMStepInstruction = {
+    stepNumber: 11,
+    instruction: "Reach Faculty Cabins.",
+    headingDegrees: 0,
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach Faculty Cabins."
+  };
+
+  const stepWalkToWashroom: LLMStepInstruction = {
+    stepNumber: 11,
+    instruction: "Move straight approx 8 steps.",
+    headingDegrees: 0,
+    headingText: "straight",
+    stepsCount: 8,
+    voicePrompt: "Move straight approx 8 steps."
+  };
+
+  const stepArriveWashroom: LLMStepInstruction = {
+    stepNumber: 12,
+    instruction: "Reach Washroom.",
+    headingDegrees: 0,
+    headingText: "arrive",
+    stepsCount: 0,
+    voicePrompt: "Reach Washroom."
+  };
+
+  // Build Route based on Destination Query using Atomic Steps (ONE action per step)
   if (destLower.includes('junction')) {
-    steps.push(stepMainToJunction);
+    steps.push(stepWalkToJunction);
   } else if (destLower.includes('stair')) {
-    steps.push(stepMainToJunction, stepJunctionToStairs);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs);
   } else if (destLower.includes('elevator') || destLower.includes('lift')) {
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsToElevator);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator);
   } else if (destLower.includes('node 5') || destLower.includes('node5')) {
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsToElevator, stepElevatorToNode5);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator, stepWalkToNode5, stepArriveNode5);
   } else if (destLower.includes('node 6') || destLower.includes('node6')) {
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsToElevator, stepElevatorToNode5, stepNode5ToNode6);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator, stepWalkToNode5, stepWalkToNode6, stepArriveNode6);
   } else if (destLower.includes('data science') || destLower.includes('ds lab')) {
     category = 'lab';
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsToDSLab);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToDSLab, stepArriveDSLab);
   } else if (destLower.includes('node 8') || destLower.includes('node8')) {
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsToDSLab, stepDSLabToNode8);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToDSLab, stepTurnLeftDSLab, stepWalkToNode8, stepArriveNode8);
   } else if (destLower.includes('auditorium')) {
     floor = 2;
     category = 'auditorium';
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsUpToFirstFloor, stepToAuditorium);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepArriveAuditorium);
   } else if (destLower.includes('ai') || destLower.includes('research')) {
     floor = 2;
     category = 'lab';
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsUpToFirstFloor, stepToAuditorium, stepToAILab);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepArriveAILab);
   } else if (destLower.includes('library')) {
     floor = 2;
     category = 'library';
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsUpToFirstFloor, stepToAuditorium, stepToAILab, stepToLibrary);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepArriveLibrary);
   } else if (destLower.includes('cabin') || destLower.includes('faculty')) {
     floor = 2;
     category = 'cabin';
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsUpToFirstFloor, stepToAuditorium, stepToAILab, stepToLibrary, stepToCabins);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepTurnLeftLibrary, stepWalkToCabins, stepArriveCabins);
   } else if (destLower.includes('washroom') || destLower.includes('toilet') || destLower.includes('restroom')) {
     floor = 2;
     category = 'washroom';
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsUpToFirstFloor, stepToAuditorium, stepToAILab, stepToLibrary, stepToCabins, stepToWashroom);
+    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepTurnLeftLibrary, stepWalkToCabins, stepWalkToWashroom, stepArriveWashroom);
   } else {
     // Custom landmark
     steps.push(
       {
         stepNumber: 1,
-        instruction: `Move straight approx 15 steps from ${startName} to main hallway junction.`,
+        instruction: `Move straight approx 15 steps from ${startName}.`,
         headingDegrees: 0,
-        headingText: "continue straight",
+        headingText: "straight",
         stepsCount: 15,
-        voicePrompt: `Move straight approx 15 steps from ${startName} to main hallway junction.`
+        voicePrompt: `Move straight approx 15 steps from ${startName}.`
       },
       {
         stepNumber: 2,
-        instruction: `Move straight approx 20 steps and turn right to reach ${destination}.`,
+        instruction: "Turn right.",
         headingDegrees: 90,
         headingText: "turn right",
+        stepsCount: 0,
+        voicePrompt: "Turn right."
+      },
+      {
+        stepNumber: 3,
+        instruction: `Move straight approx 20 steps to reach ${destination}.`,
+        headingDegrees: 0,
+        headingText: "straight",
         stepsCount: 20,
-        voicePrompt: `Move straight approx 20 steps and turn right to reach ${destination}.`
+        voicePrompt: `Move straight approx 20 steps to reach ${destination}.`
       }
     );
   }
@@ -353,7 +486,7 @@ const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKn
   totalSteps = steps.reduce((sum, s) => sum + s.stepsCount, 0);
 
   return {
-    id: `ROUTE_CORPUS_${destination.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${Date.now()}`,
+    id: `ROUTE_ATOMIC_${destination.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${Date.now()}`,
     category,
     destinationName: destination,
     aliases: [destination.toLowerCase()],
@@ -362,7 +495,7 @@ const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKn
     floor,
     totalSteps,
     totalDistanceMeters: Math.round(totalSteps * 0.75),
-    overviewSummary: `Step-by-step navigation route from ${startName} to ${destination} synthesized directly from corpus text (${steps.length} steps, ${totalSteps} total footsteps).`,
+    overviewSummary: `Atomic step navigation route from ${startName} to ${destination} (${steps.length} simple steps).`,
     steps
   };
 };
