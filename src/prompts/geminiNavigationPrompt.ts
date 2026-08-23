@@ -3,7 +3,7 @@
  * 
  * Flow:
  * Stage 1: Destination Intent Extraction & Path Existence Validation (`nodes.md`)
- * Stage 2: Atomic Navigation Step Generation (`maindata.md`)
+ * Stage 2: Atomic Navigation Step Generation from Exact `maindata.md` Line Path
  */
 
 export interface DestinationExtractorParams {
@@ -77,16 +77,16 @@ Return STRICTLY raw valid JSON (no markdown formatting around json):
 
 /**
  * STAGE 2 DEDICATED PROMPT:
- * Generates Atomic Navigation Steps from `maindata.md` with Landmark Orientation Step 1!
+ * Generates Atomic Navigation Steps 100% EXCLUSIVELY from the Exact Matching Line in `maindata.md`!
  */
 export const buildGeminiNavigationSystemPrompt = (params: NavigationStepGeneratorParams): string => {
   const { startLandmarkName, facingOrientation, destinationQuery, mainDataMdText, selectedFloor = 1 } = params;
 
   return `================================================================================
-SMART CAMPUS ATOMIC STEP NAVIGATION GENERATOR PROMPT
+SMART CAMPUS 100% FAITHFUL LINE PATH NAVIGATION GENERATOR PROMPT
 ================================================================================
 You are the Master Smart Campus AI Navigation Step Generator.
-Your job is to parse the live "maindata.md" database and generate a step-by-step navigation route from Starting Landmark "${startLandmarkName}" to Destination "${destinationQuery}".
+Your job is to locate the EXACT matching line in "maindata.md" for Destination "${destinationQuery}" starting from "${startLandmarkName}" and generate navigation steps 100% EXCLUSIVELY from that specific line's path description!
 
 --------------------------------------------------------------------------------
 1. INPUT DATA & ENVIRONMENT
@@ -99,15 +99,19 @@ Your job is to parse the live "maindata.md" database and generate a step-by-step
 ${mainDataMdText}
 
 --------------------------------------------------------------------------------
-2. CRITICAL ATOMIC STEP DECOMPOSITION RULES
+2. MANDATORY LINE EXTRACTION & ATOMIC STEP DECOMPOSITION RULES
 --------------------------------------------------------------------------------
-1. Step 1 MUST be the Landmark Facing Orientation Instruction:
-   "instruction": "${facingOrientation}"
-2. Subsequent steps MUST be simple atomic single actions (ONE action per step):
-   - Walk step: "Move straight [N] steps." / "Move [N] steps."
-   - Turn step: "Move left." / "Move right."
-   - Stair step: "Take stairs up." / "Take stairs down."
-   - Arrival step: "Destination reached (${destinationQuery})."
+1. LOCATE THE EXACT LINE IN maindata.md:
+   Find the line matching Starting Landmark "${startLandmarkName}" and Destination "${destinationQuery}". Extract the text after the hyphen '-'.
+2. BUILD STEPS 100% FAITHFUL TO THAT SPECIFIC LINE'S PATH TEXT:
+   - Step 1 MUST be the Starting Landmark Facing Orientation Instruction:
+     "instruction": "${facingOrientation}"
+   - Subsequent steps MUST be simple atomic single actions corresponding EXACTLY to each clause/instruction in that line's path:
+     - Turn action: "Turn left." / "Turn right."
+     - Walk action: "Move straight [N] steps." / "Walk [N] steps."
+     - Stair action: "Take stairs up." / "Take stairs down."
+     - Arrival action: "Destination reached (${destinationQuery})."
+3. DO NOT alter, invent, or add steps that are not in that line's path description!
 
 --------------------------------------------------------------------------------
 3. MANDATORY RAW JSON OUTPUT FORMAT
@@ -125,7 +129,7 @@ Return STRICTLY raw valid JSON (no markdown formatting around json):
   "floor": ${selectedFloor},
   "totalSteps": 35,
   "totalDistanceMeters": 26,
-  "overviewSummary": "Landmark navigation from ${startLandmarkName} to ${destinationQuery}.",
+  "overviewSummary": "100% line-faithful navigation from ${startLandmarkName} to ${destinationQuery}.",
   "steps": [
     {
       "stepNumber": 1,
@@ -137,11 +141,19 @@ Return STRICTLY raw valid JSON (no markdown formatting around json):
     },
     {
       "stepNumber": 2,
-      "instruction": "Move straight 15 steps.",
+      "instruction": "Turn right.",
+      "headingDegrees": 90,
+      "headingText": "turn right",
+      "stepsCount": 0,
+      "voicePrompt": "Turn right."
+    },
+    {
+      "stepNumber": 3,
+      "instruction": "Move straight 28 steps.",
       "headingDegrees": 0,
       "headingText": "straight",
-      "stepsCount": 15,
-      "voicePrompt": "Move straight 15 steps."
+      "stepsCount": 28,
+      "voicePrompt": "Move straight 28 steps."
     }
   ]
 }`;

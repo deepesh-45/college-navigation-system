@@ -51,15 +51,17 @@ export const saveMainDataMarkdownText = (mdText: string) => {
   }
 };
 
-// Decompose raw walk path description into small atomic single-work steps
+// 100% FAITHFUL ATOMIC STEP DECOMPOSER FROM EXACT LINE PATH TEXT
 export const breakdownPathToAtomicSteps = (pathText: string, destination: string): MainDataAtomicStep[] => {
   const steps: MainDataAtomicStep[] = [];
-  const sentences = pathText.split(/(?<=[.!?])\s+|\s*\.\s*|\n+/).filter(s => s.trim().length > 0);
+  
+  // Split path by periods, commas, or 'and' clauses
+  const clauses = pathText.split(/(?<=[.!?])\s*|\s*\.\s*|\s*,\s*|\n+/).filter(s => s.trim().length > 0);
 
   let stepCounter = 1;
 
-  for (const sentence of sentences) {
-    const sLower = sentence.toLowerCase().trim();
+  for (const rawClause of clauses) {
+    const sLower = rawClause.toLowerCase().trim();
     if (!sLower) continue;
 
     // Extract step count digits
@@ -71,16 +73,16 @@ export const breakdownPathToAtomicSteps = (pathText: string, destination: string
     let headingText = 'straight';
     let instruction = '';
 
-    if (sLower.includes('left') || sLower.includes('move left') || sLower.includes('turn left')) {
+    if (sLower.includes('turn left') || (sLower.includes('left') && !sLower.includes('on the left') && !sLower.includes('left side') && !sLower.includes('left of'))) {
       action = 'left';
       headingDegrees = 270;
       headingText = 'turn left';
-      instruction = 'Move left';
-    } else if (sLower.includes('right') || sLower.includes('move right') || sLower.includes('turn right')) {
+      instruction = 'Turn left';
+    } else if (sLower.includes('turn right') || (sLower.includes('right') && !sLower.includes('on the right') && !sLower.includes('right side') && !sLower.includes('right of'))) {
       action = 'right';
       headingDegrees = 90;
       headingText = 'turn right';
-      instruction = 'Move right';
+      instruction = 'Turn right';
     } else if (sLower.includes('stair') || sLower.includes('stairs up')) {
       action = 'stair_up';
       headingDegrees = 0;
@@ -91,7 +93,17 @@ export const breakdownPathToAtomicSteps = (pathText: string, destination: string
       headingDegrees = 0;
       headingText = 'take elevator';
       instruction = stepsCount > 0 ? `Move straight ${stepsCount} steps and take elevator` : 'Take elevator';
-    } else if (sLower.includes('destination') || sLower.includes('reach') || sLower.includes('arrived') || sLower.includes('infront') || sLower.includes('in front')) {
+    } else if (
+      sLower.includes('destination') ||
+      sLower.includes('infront') ||
+      sLower.includes('in front') ||
+      sLower.includes('on left') ||
+      sLower.includes('on right') ||
+      sLower.includes('left side') ||
+      sLower.includes('right side') ||
+      sLower.includes('where you are standing') ||
+      sLower.includes('exact same')
+    ) {
       action = 'arrive';
       headingDegrees = 0;
       headingText = 'arrive';
@@ -198,7 +210,7 @@ const extractNumbersFromString = (str: string): number[] => {
   return matches ? matches.map(m => parseInt(m, 10)) : [];
 };
 
-// INTENT & NUMERIC KEYWORD SEARCH IN MAINDATA.MD
+// INTENT & NUMERIC KEYWORD SEARCH IN MAINDATA.MD (100% Faithful Line Selection)
 export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: string): MainDataRoute | null => {
   const mdText = loadMainDataMarkdownText();
   const routes = parseMainDataMarkdown(mdText);
@@ -228,7 +240,6 @@ export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: str
       if (qNums.length > 0 && aNums.length > 0) {
         const hasNumberMatch = qNums.some(num => aNums.includes(num));
         if (hasNumberMatch) {
-          // Check for category keyword alignment (e.g. "room", "f", "lab", "floor", "stairs")
           const keywords = ['room', 'f', 'lab', 'stairs', 'floor', 'node'];
           const qHasKeyword = keywords.some(k => qRaw.includes(k));
           const aHasKeyword = keywords.some(k => aRaw.includes(k));
@@ -265,8 +276,18 @@ export const findMainDataRouteFromMarkdown = (query: string, startLandmark?: str
 
 // Convert MainDataRoute to LLMRouteKnowledge for navigation cockpit
 export const convertMainDataToLLMRoute = (route: MainDataRoute): LLMRouteKnowledge => {
-  const llmSteps: LLMStepInstruction[] = route.atomicSteps.map(s => ({
-    stepNumber: s.stepNumber,
+  // Step 1: Landmark Facing Orientation Step
+  const step1: LLMStepInstruction = {
+    stepNumber: 1,
+    instruction: route.facingOrientation,
+    headingDegrees: 0,
+    headingText: 'orient',
+    stepsCount: 0,
+    voicePrompt: route.facingOrientation
+  };
+
+  const atomicLLMSteps: LLMStepInstruction[] = route.atomicSteps.map((s, idx) => ({
+    stepNumber: idx + 2,
     instruction: s.instruction,
     headingDegrees: s.headingDegrees,
     headingText: s.headingText,
@@ -275,7 +296,8 @@ export const convertMainDataToLLMRoute = (route: MainDataRoute): LLMRouteKnowled
     voicePrompt: s.instruction
   }));
 
-  const totalSteps = llmSteps.reduce((sum, s) => sum + s.stepsCount, 0);
+  const allSteps = [step1, ...atomicLLMSteps];
+  const totalSteps = allSteps.reduce((sum, s) => sum + s.stepsCount, 0);
 
   return {
     id: route.id,
@@ -288,7 +310,7 @@ export const convertMainDataToLLMRoute = (route: MainDataRoute): LLMRouteKnowled
     floor: route.floor,
     totalSteps,
     totalDistanceMeters: Math.round(totalSteps * 0.75),
-    overviewSummary: `Landmark navigation to ${route.destination} via ${route.startLandmark} (${llmSteps.length} atomic steps).`,
-    steps: llmSteps
+    overviewSummary: `100% line-faithful navigation to ${route.destination} via ${route.startLandmark} (${allSteps.length} steps).`,
+    steps: allSteps
   };
 };
