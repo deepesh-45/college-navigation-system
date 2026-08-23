@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Sparkles, CheckCircle2, Copy, Download, RefreshCw, X, FileText, Database, Plus, Layers } from 'lucide-react';
+import { Mic, MicOff, Sparkles, CheckCircle2, Copy, Download, RefreshCw, X, FileText, Database, Plus, Layers, Compass, MapPin } from 'lucide-react';
 import { LLM_ROUTES_KNOWLEDGE, saveLLMRoutesToStorage } from '../data/llmRoutesKnowledge';
 import { CAMPUS_NODES, CAMPUS_EDGES, saveCampusGraphToStorage } from '../data/campusGraphData';
 import { synthesizeCampusCorpusWithGemini } from '../services/geminiCorpusSynthesizer';
 import { speechService } from '../services/speechService';
 import { GROUND_FLOOR_CORPUS, FIRST_FLOOR_CORPUS } from '../data/corpuses';
+import { CAMPUS_LANDMARKS, CampusLandmark } from '../data/landmarksData';
+import { getNodesForFloor } from '../data/nodes';
 
 interface AdminPortalViewProps {
   onClose: () => void;
@@ -19,11 +21,31 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose }) => 
     2: FIRST_FLOOR_CORPUS.trim()
   });
 
+  // Selected Landmark per floor
+  const [selectedLandmarkId, setSelectedLandmarkId] = useState<string>('landmark_floor_1_main_entrance');
+
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [synthesisResultMsg, setSynthesisResultMsg] = useState<string | null>(null);
   const [copiedDataset, setCopiedDataset] = useState<boolean>(false);
+
+  // Filter landmarks available for the selected floor
+  const floorLandmarks: CampusLandmark[] = CAMPUS_LANDMARKS.filter(l => l.floor === selectedFloor);
+
+  // Active landmark selected
+  const activeLandmark: CampusLandmark =
+    floorLandmarks.find(l => l.id === selectedLandmarkId) ||
+    floorLandmarks[0] ||
+    CAMPUS_LANDMARKS[0];
+
+  // Update active landmark when floor changes
+  useEffect(() => {
+    const defaultForFloor = CAMPUS_LANDMARKS.find(l => l.floor === selectedFloor);
+    if (defaultForFloor) {
+      setSelectedLandmarkId(defaultForFloor.id);
+    }
+  }, [selectedFloor]);
 
   // Live Recording Timer
   useEffect(() => {
@@ -36,7 +58,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose }) => 
     return () => clearInterval(timer);
   }, [isRecording]);
 
-  // Robust Non-Glitching Voice Speech-to-Text STT using SpeechHandler
+  // Voice Recording STT
   const handleToggleRecording = () => {
     if (isRecording) {
       speechService.stopListening();
@@ -108,7 +130,6 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({ onClose }) => 
       }
     });
 
-    // Save automatically to device storage (localStorage)
     saveCampusGraphToStorage();
     saveLLMRoutesToStorage();
 
@@ -159,6 +180,8 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
     }
   };
 
+  const mappedFloorNodes = getNodesForFloor(selectedFloor);
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-slate-100 flex flex-col h-[100dvh] max-h-[100dvh] w-full overflow-hidden font-l3">
       
@@ -170,10 +193,10 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
           </div>
           <div>
             <h2 className="font-l2 text-base sm:text-lg font-black text-white leading-none">
-              Admin Portal — Direct Floor Corpus Navigation Synthesizer
+              Admin Portal — Landmark-Anchored Data Collection
             </h2>
             <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-              Ground Floor (Floor 1) & First Floor (Floor 2) Raw Spoken Corpuses
+              Floor Selection • Landmark Position Mapping • Spoken Walk Corpuses
             </p>
           </div>
         </div>
@@ -189,12 +212,12 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
       {/* FULL SCREEN BODY CONTENT */}
       <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4 max-w-4xl mx-auto w-full">
         
-        {/* FLOOR SELECTOR TABS & ADD FLOOR BUTTON */}
+        {/* 1. FLOOR SELECTOR TABS & ADD FLOOR BUTTON */}
         <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase text-slate-400 flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-blue-500" />
-              Select Active Building Floor Corpus:
+              Select Floor for Data Collection:
             </span>
             <button
               onClick={handleAddFloor}
@@ -223,12 +246,48 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
           </div>
         </div>
 
-        {/* SPOKEN VOICE AUDIO RECORDER CONTROLLER */}
+        {/* 2. FETCH FLOOR LANDMARKS & STARTING LANDMARK SELECTOR */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <Compass className="w-4 h-4 text-amber-400" />
+              Floor {selectedFloor} Available Landmarks (from landmarks.json):
+            </span>
+          </div>
+
+          {/* Landmark Dropdown Selector */}
+          <select
+            value={selectedLandmarkId}
+            onChange={(e) => setSelectedLandmarkId(e.target.value)}
+            className="w-full p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-slate-100 focus:outline-none focus:border-blue-500"
+          >
+            {floorLandmarks.map((l) => (
+              <option key={l.id} value={l.id}>
+                📍 {l.name} ({l.building} • Floor {l.floor})
+              </option>
+            ))}
+          </select>
+
+          {/* Selected Landmark Facing Orientation Instructions */}
+          {activeLandmark && (
+            <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-800/80 text-amber-200 space-y-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-400">
+                <Compass className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <span>Starting Position & Facing Orientation Rule:</span>
+              </div>
+              <p className="text-xs font-bold text-amber-100">
+                👉 <strong>{activeLandmark.name}</strong>: "{activeLandmark.facingOrientation}"
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 3. SPOKEN VOICE AUDIO RECORDER CONTROLLER */}
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
               <Mic className="w-4 h-4 text-blue-500" />
-              {selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : `Floor ${selectedFloor}`} Voice Audio Recorder
+              Record Spoken Walk Corpus from {activeLandmark.name}
             </span>
             {isRecording && (
               <span className="text-xs font-black text-rose-400 animate-pulse flex items-center gap-1">
@@ -247,7 +306,7 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
               }`}
             >
               {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              <span>{isRecording ? 'Stop Recording' : `🎙️ Record Voice for ${selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : 'Floor ' + selectedFloor}`}</span>
+              <span>{isRecording ? 'Stop Recording' : `🎙️ Record Walk from ${activeLandmark.name}`}</span>
             </button>
 
             <button
@@ -260,22 +319,39 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
           </div>
         </div>
 
-        {/* SPOKEN CORPUS TEXT AREA FOR SELECTED FLOOR */}
+        {/* 4. SPOKEN CORPUS TEXT AREA FOR SELECTED FLOOR */}
         <div className="space-y-1.5">
           <label className="text-xs font-black uppercase text-slate-300 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-blue-500" />
-              {selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : `Floor ${selectedFloor}`} Spoken Corpus Text:
+              {selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : `Floor ${selectedFloor}`} Walk Corpus Text (from {activeLandmark.name}):
             </span>
             <span className="text-[10px] font-semibold text-slate-400">Editable Raw Corpus</span>
           </label>
           <textarea
-            rows={6}
+            rows={5}
             value={floorCorpusMap[selectedFloor] || ''}
             onChange={(e) => setFloorCorpusMap({ ...floorCorpusMap, [selectedFloor]: e.target.value })}
-            placeholder={`Speak or type ${selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : 'Floor ' + selectedFloor} walk description...`}
+            placeholder={`Speak or type ${selectedFloor === 1 ? 'Ground Floor' : selectedFloor === 2 ? 'First Floor' : 'Floor ' + selectedFloor} walk description starting from ${activeLandmark.name}...`}
             className="w-full p-3.5 rounded-2xl border border-slate-700 text-xs font-medium text-slate-100 bg-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-inner leading-relaxed"
           />
+        </div>
+
+        {/* 5. MAPPED POSITIONS FROM LANDMARK (floorNodes) */}
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
+          <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <MapPin className="w-4 h-4 text-emerald-400" />
+            Mapped Positions for Floor {selectedFloor} (from {activeLandmark.name}):
+          </span>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {mappedFloorNodes.map(node => (
+              <div key={node.id} className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-200 flex items-center justify-between">
+                <span className="truncate">{node.name}</span>
+                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300">{node.type}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* GEMINI AI SYNTHESIZE DIRECTLY FROM CORPUSES BUTTON */}
@@ -285,7 +361,7 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
           className="w-full py-4 px-5 rounded-2xl bg-brand-gradient hover:opacity-95 disabled:opacity-50 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transform active:scale-95 transition-all"
         >
           <Sparkles className="w-5 h-5 text-amber-300 animate-spin" />
-          <span>{isSynthesizing ? 'Extracting Step-by-Step Navigation from Corpuses...' : '✨ Generate Direct Navigation Routes from Corpuses with Gemini AI'}</span>
+          <span>{isSynthesizing ? 'Extracting Step-by-Step Navigation from Corpuses...' : '✨ Synthesize Direct Navigation Routes from Corpuses with Gemini AI'}</span>
         </button>
 
         {/* SYNTHESIS RESULT NOTIFICATION BANNER */}
@@ -299,12 +375,12 @@ export const EXTRACTED_ROUTES = ${JSON.stringify(LLM_ROUTES_KNOWLEDGE, null, 2)}
         {/* LIVE DATASET STATS */}
         <div className="grid grid-cols-3 gap-3 text-center">
           <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
-            <span className="text-[10px] font-bold uppercase text-slate-400 block">Atomic Nodes</span>
-            <span className="text-xl font-black text-blue-400">{CAMPUS_NODES.length}</span>
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Anchor Landmarks</span>
+            <span className="text-xl font-black text-amber-400">{CAMPUS_LANDMARKS.length}</span>
           </div>
           <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
-            <span className="text-[10px] font-bold uppercase text-slate-400 block">Graph Edges</span>
-            <span className="text-xl font-black text-blue-400">{CAMPUS_EDGES.length}</span>
+            <span className="text-[10px] font-bold uppercase text-slate-400 block">Mapped Nodes</span>
+            <span className="text-xl font-black text-blue-400">{mappedFloorNodes.length}</span>
           </div>
           <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800">
             <span className="text-[10px] font-bold uppercase text-slate-400 block">LLM Routes</span>

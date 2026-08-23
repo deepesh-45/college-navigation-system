@@ -18,6 +18,7 @@ export interface GraphNode {
   building: string;
   floor: number;
   aliases: string[];
+  coordinates?: { x: number; y: number };
 }
 
 export interface GraphEdge {
