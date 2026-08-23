@@ -5,84 +5,27 @@ import { VantaBackground } from './VantaBackground';
 
 import { speechService } from '../services/speechService';
 import { resolveLLMVoiceQueryAsync } from '../services/llmNavigationEngine';
-import { LLMRouteKnowledge, LLM_ROUTES_KNOWLEDGE } from '../data/llmRoutesKnowledge';
+import { LLMRouteKnowledge } from '../data/llmRoutesKnowledge';
 import { VoiceState } from '../types';
 import { sensorService } from '../services/sensorService';
 
-import { Mic, MicOff, Navigation, Key, ArrowLeft, MapPin, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
+import { Mic, MicOff, Navigation, Key, ArrowLeft, MapPin, AlertTriangle, CheckCircle2, Sparkles, Compass } from 'lucide-react';
 
 interface MobileNavigationViewProps {
   userRole: string;
   onBackToGreeting: () => void;
 }
 
-const DEFAULT_STARTER_ROUTE: LLMRouteKnowledge = {
-  id: "STARTER_DEFAULT_ROUTE",
-  category: "lab",
-  destinationName: "Data Science Lab",
-  aliases: ["data science lab", "ds lab"],
-  startPoint: "Main Entrance",
-  building: "Main Campus Building",
-  floor: 1,
-  totalSteps: 79,
-  totalDistanceMeters: 59,
-  overviewSummary: "Step-by-step route to Data Science Lab synthesized from campus corpus.",
-  steps: [
-    {
-      stepNumber: 1,
-      instruction: "Move straight approx 15 steps and continue straight.",
-      headingDegrees: 0,
-      headingText: "continue straight",
-      stepsCount: 15,
-      voicePrompt: "Move straight approx 15 steps and continue straight."
-    },
-    {
-      stepNumber: 2,
-      instruction: "Move straight approx 14 steps and turn left.",
-      headingDegrees: 270,
-      headingText: "turn left",
-      stepsCount: 14,
-      voicePrompt: "Move straight approx 14 steps and turn left."
-    },
-    {
-      stepNumber: 3,
-      instruction: "Move straight approx 20 steps and continue straight.",
-      headingDegrees: 0,
-      headingText: "continue straight",
-      stepsCount: 20,
-      voicePrompt: "Move straight approx 20 steps and continue straight."
-    },
-    {
-      stepNumber: 4,
-      instruction: "Move straight approx 20 steps and take stairs up.",
-      headingDegrees: 0,
-      headingText: "take stairs up",
-      stepsCount: 20,
-      voicePrompt: "Move straight approx 20 steps and take stairs up."
-    },
-    {
-      stepNumber: 5,
-      instruction: "Move straight approx 10 steps to reach Data Science Lab.",
-      headingDegrees: 0,
-      headingText: "continue straight",
-      stepsCount: 10,
-      voicePrompt: "Move straight approx 10 steps to reach Data Science Lab."
-    }
-  ]
-};
-
 export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   onBackToGreeting
 }) => {
-  const initialRoute = LLM_ROUTES_KNOWLEDGE.length > 0 ? LLM_ROUTES_KNOWLEDGE[0] : DEFAULT_STARTER_ROUTE;
-
-  // Type-Based Input Text Fields (Not locked dropdown selection)
-  const [startPointInput, setStartPointInput] = useState<string>(initialRoute.startPoint);
-  const [destinationInput, setDestinationInput] = useState<string>(initialRoute.destinationName);
+  // Completely blank type-based input fields by default
+  const [startPointInput, setStartPointInput] = useState<string>('');
+  const [destinationInput, setDestinationInput] = useState<string>('');
 
   // Active Navigation State
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
-  const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge>(initialRoute);
+  const [activeLLMRoute, setActiveLLMRoute] = useState<LLMRouteKnowledge | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState<boolean>(false);
 
   // Voice & Ambiguity State
@@ -94,9 +37,14 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
   // Admin Portal Modal
   const [showAdminPortal, setShowAdminPortal] = useState<boolean>(false);
 
-  // Handle Start Navigation Button Click (Fetches direct corpus steps between type-based Start Point & Destination)
+  // Handle Start Navigation Button Click (Synthesizes steps directly from corpus for entered start & destination)
   const handleStartNavigation = async () => {
-    if (!destinationInput.trim()) return;
+    if (!destinationInput.trim()) {
+      alert('Please type or speak a destination location to start navigation!');
+      return;
+    }
+
+    const effectiveStartPoint = startPointInput.trim() || 'Main Entrance';
 
     sensorService.resetStepCounter();
     sensorService.triggerHapticFeedback([100]);
@@ -104,7 +52,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     setFallbackAlert(null);
     setAmbiguousOptions(null);
 
-    const result = await resolveLLMVoiceQueryAsync(destinationInput, startPointInput);
+    const result = await resolveLLMVoiceQueryAsync(destinationInput.trim(), effectiveStartPoint);
 
     setIsLoadingRoute(false);
 
@@ -114,8 +62,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
       const firstStepPrompt = result.route.steps[0]?.voicePrompt || result.route.steps[0]?.instruction || 'Proceed straight';
       speechService.speak(`Starting navigation from ${result.route.startPoint} to ${result.route.destinationName}. Step 1: ${firstStepPrompt}`);
     } else {
-      setIsNavigating(true);
-      speechService.speak(`Starting navigation to ${destinationInput}.`);
+      alert(`Could not extract navigation route from ${effectiveStartPoint} to "${destinationInput}". Please check the Admin Panel campus corpus.`);
     }
   };
 
@@ -147,12 +94,12 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
     );
   };
 
-  // Process Voice Query: Gemini API decodes startPoint and destination, updates text inputs, and starts navigation
+  // Process Voice Query: Gemini API decodes startPoint and destination from voice, updates inputs, and fetches corpus steps
   const handleProcessVoiceQuery = async (query: string) => {
     setVoiceState('processing');
     setIsLoadingRoute(true);
 
-    const result = await resolveLLMVoiceQueryAsync(query);
+    const result = await resolveLLMVoiceQueryAsync(query, startPointInput.trim() || undefined);
     setIsLoadingRoute(false);
 
     if (result.parsedIntent) {
@@ -219,7 +166,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
         </button>
       </div>
 
-      {/* 1. TYPE-BASED INPUT FIELDS (START LOCATION & DESTINATION) */}
+      {/* 1. CLEAN TYPE-BASED INPUT FIELDS (START LOCATION & DESTINATION) */}
       <div className="p-2.5 sm:p-3 rounded-2xl bg-white border border-slate-200 shadow space-y-2 z-10">
         <div className="grid grid-cols-2 gap-2">
           {/* Start Point Type-Based Text Input */}
@@ -234,7 +181,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
                 setStartPointInput(e.target.value);
                 setIsNavigating(false);
               }}
-              placeholder="e.g. Main Entrance, Hallway Junction"
+              placeholder="e.g. Main Entrance"
               className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8] truncate"
             />
           </div>
@@ -251,7 +198,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
                 setDestinationInput(e.target.value);
                 setIsNavigating(false);
               }}
-              placeholder="e.g. Data Science Lab, Washroom"
+              placeholder="e.g. Data Science Lab"
               className="w-full p-2 rounded-lg bg-slate-50 border border-slate-300 text-[11px] font-bold text-slate-900 focus:outline-none focus:border-[#1d4ed8] truncate"
             />
           </div>
@@ -280,7 +227,7 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
           </button>
 
           <button
-            disabled={isLoadingRoute}
+            disabled={isLoadingRoute || !destinationInput.trim()}
             onClick={handleStartNavigation}
             className="flex-1 py-2 px-3 rounded-xl bg-brand-gradient hover:opacity-95 text-white font-black text-[11px] uppercase tracking-wider shadow flex items-center justify-center gap-1.5 transform active:scale-95 transition-all disabled:opacity-50"
           >
@@ -327,13 +274,27 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
 
       {/* 2. REAL-TIME COMPASS & STEP COUNTER COCKPIT */}
       <div className="z-10 flex-1 flex flex-col min-h-0">
-        <LLMVoiceCockpit
-          route={activeLLMRoute}
-          isNavigating={isNavigating}
-          onArrived={() => {
-            speechService.speak(`You have arrived at ${activeLLMRoute.destinationName}`);
-          }}
-        />
+        {activeLLMRoute ? (
+          <LLMVoiceCockpit
+            route={activeLLMRoute}
+            isNavigating={isNavigating}
+            onArrived={() => {
+              speechService.speak(`You have arrived at ${activeLLMRoute.destinationName}`);
+            }}
+          />
+        ) : (
+          <div className="flex-1 rounded-2xl bg-white/80 backdrop-blur-md border border-slate-200 p-6 flex flex-col items-center justify-center text-center space-y-3 shadow-inner">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-sm">
+              <Compass className="w-7 h-7" />
+            </div>
+            <div>
+              <h4 className="font-l2 text-sm font-black text-slate-800">Ready for Navigation</h4>
+              <p className="text-[11px] font-semibold text-slate-500 max-w-xs mt-1">
+                Type or speak your destination (e.g. "Data Science Lab", "Washroom"), then tap <strong className="text-blue-600">Start Navigation ➔</strong>.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Admin Portal Modal */}
@@ -341,17 +302,19 @@ export const MobileNavigationView: React.FC<MobileNavigationViewProps> = ({
         <AdminPortalView
           onClose={() => setShowAdminPortal(false)}
           onRouteAdded={(newRoute) => {
-            setActiveLLMRoute(newRoute);
-            setStartPointInput(newRoute.startPoint);
-            setDestinationInput(newRoute.destinationName);
-            setIsNavigating(true);
+            if (newRoute) {
+              setActiveLLMRoute(newRoute);
+              setStartPointInput(newRoute.startPoint);
+              setDestinationInput(newRoute.destinationName);
+              setIsNavigating(true);
+            }
           }}
         />
       )}
 
       {/* Compact Single-Screen Footer */}
       <footer className="p-1.5 bg-white/80 backdrop-blur-md rounded-xl border border-slate-200 text-center text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-wider z-10">
-        Smart Campus AI Navigation • Gemini AI Intent Parser & Corpus Engine
+        Smart Campus AI Navigation • Clear Inputs & Direct Corpus Engine
       </footer>
     </div>
   );
