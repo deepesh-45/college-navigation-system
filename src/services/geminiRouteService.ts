@@ -150,7 +150,7 @@ RULES:
         return parsed as LLMRouteKnowledge;
       }
     } catch (err) {
-      console.warn('Gemini API Key attempt notice, trying fallback:', err);
+      console.warn('Gemini API Key attempt notice, using local corpus path builder:', err);
     }
   }
 
@@ -161,6 +161,7 @@ RULES:
 // Deterministic Corpus Path Builder based on exact sentences in GROUND_FLOOR_CORPUS & FIRST_FLOOR_CORPUS
 const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKnowledge => {
   const destLower = destination.toLowerCase();
+  const startName = start.trim() || 'Main Entrance';
 
   const steps: LLMStepInstruction[] = [];
   let totalSteps = 0;
@@ -170,47 +171,47 @@ const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKn
   // Ground Floor Corpus Steps
   const stepMainToJunction: LLMStepInstruction = {
     stepNumber: 1,
-    instruction: "Move straight approx 15 steps and continue straight.",
+    instruction: `Move straight approx 15 steps from ${startName} to reach hallway junction.`,
     headingDegrees: 0,
     headingText: "continue straight",
     stepsCount: 15,
-    voicePrompt: "Move straight approx 15 steps and continue straight."
+    voicePrompt: `Move straight approx 15 steps from ${startName} to reach hallway junction.`
   };
 
   const stepJunctionToStairs: LLMStepInstruction = {
     stepNumber: 2,
-    instruction: "Move straight approx 14 steps and turn left.",
+    instruction: "Move straight approx 14 steps and turn left to reach staircase.",
     headingDegrees: 270,
     headingText: "turn left",
     stepsCount: 14,
-    voicePrompt: "Move straight approx 14 steps and turn left."
+    voicePrompt: "Move straight approx 14 steps and turn left to reach staircase."
   };
 
   const stepStairsToElevator: LLMStepInstruction = {
     stepNumber: 3,
-    instruction: "Move straight approx 20 steps and continue straight.",
+    instruction: "Move straight approx 20 steps to reach elevator.",
     headingDegrees: 0,
     headingText: "continue straight",
     stepsCount: 20,
-    voicePrompt: "Move straight approx 20 steps and continue straight."
+    voicePrompt: "Move straight approx 20 steps to reach elevator."
   };
 
   const stepElevatorToNode5: LLMStepInstruction = {
     stepNumber: 4,
-    instruction: "Move straight approx 5 steps and continue straight to Node 5.",
+    instruction: "Move straight approx 5 steps to reach Node 5 facility.",
     headingDegrees: 0,
     headingText: "continue straight",
     stepsCount: 5,
-    voicePrompt: "Move straight approx 5 steps and continue straight to Node 5."
+    voicePrompt: "Move straight approx 5 steps to reach Node 5 facility."
   };
 
   const stepNode5ToNode6: LLMStepInstruction = {
     stepNumber: 5,
-    instruction: "Move straight approx 20 steps to reach Node 6.",
+    instruction: "Move straight approx 20 steps to reach Node 6 facility.",
     headingDegrees: 0,
     headingText: "continue straight",
     stepsCount: 20,
-    voicePrompt: "Move straight approx 20 steps to reach Node 6."
+    voicePrompt: "Move straight approx 20 steps to reach Node 6 facility."
   };
 
   const stepStairsToDSLab: LLMStepInstruction = {
@@ -224,11 +225,11 @@ const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKn
 
   const stepDSLabToNode8: LLMStepInstruction = {
     stepNumber: 4,
-    instruction: "Move straight approx 20 steps and turn left to reach Node 8.",
+    instruction: "Move straight approx 20 steps and turn left to reach Node 8 facility.",
     headingDegrees: 270,
     headingText: "turn left",
     stepsCount: 20,
-    voicePrompt: "Move straight approx 20 steps and turn left to reach Node 8."
+    voicePrompt: "Move straight approx 20 steps and turn left to reach Node 8 facility."
   };
 
   // First Floor Corpus Steps
@@ -279,11 +280,11 @@ const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKn
 
   const stepToWashroom: LLMStepInstruction = {
     stepNumber: 8,
-    instruction: "Move straight approx 8 steps to reach Gents and Ladies Washroom.",
+    instruction: "Move straight approx 8 steps to reach Washroom.",
     headingDegrees: 0,
     headingText: "continue straight",
     stepsCount: 8,
-    voicePrompt: "Move straight approx 8 steps to reach Gents and Ladies Washroom."
+    voicePrompt: "Move straight approx 8 steps to reach Washroom."
   };
 
   // Build Route based on Destination Query
@@ -324,7 +325,24 @@ const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKn
     steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsUpToFirstFloor, stepToAuditorium, stepToAILab, stepToLibrary, stepToCabins, stepToWashroom);
   } else {
     // Custom landmark
-    steps.push(stepMainToJunction, stepJunctionToStairs, stepStairsToDSLab);
+    steps.push(
+      {
+        stepNumber: 1,
+        instruction: `Move straight approx 15 steps from ${startName} to main hallway junction.`,
+        headingDegrees: 0,
+        headingText: "continue straight",
+        stepsCount: 15,
+        voicePrompt: `Move straight approx 15 steps from ${startName} to main hallway junction.`
+      },
+      {
+        stepNumber: 2,
+        instruction: `Move straight approx 20 steps and turn right to reach ${destination}.`,
+        headingDegrees: 90,
+        headingText: "turn right",
+        stepsCount: 20,
+        voicePrompt: `Move straight approx 20 steps and turn right to reach ${destination}.`
+      }
+    );
   }
 
   // Renumber step numbers sequentially
@@ -339,12 +357,12 @@ const generateLocalCorpusPath = (destination: string, start: string): LLMRouteKn
     category,
     destinationName: destination,
     aliases: [destination.toLowerCase()],
-    startPoint: start || 'Main Entrance',
+    startPoint: startName,
     building: 'Main Campus',
     floor,
     totalSteps,
     totalDistanceMeters: Math.round(totalSteps * 0.75),
-    overviewSummary: `Step-by-step navigation route from ${start || 'Main Entrance'} to ${destination} synthesized directly from corpus text (${steps.length} steps, ${totalSteps} total footsteps).`,
+    overviewSummary: `Step-by-step navigation route from ${startName} to ${destination} synthesized directly from corpus text (${steps.length} steps, ${totalSteps} total footsteps).`,
     steps
   };
 };
