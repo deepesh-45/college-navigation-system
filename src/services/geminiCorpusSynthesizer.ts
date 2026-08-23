@@ -17,31 +17,64 @@ export const synthesizeCampusCorpusWithGemini = async (
     return fallbackLocalCorpusParser(rawTranscriptText);
   }
 
-  const systemPrompt = `You are an expert AI Spatial Graph Architect for Smart Campus Navigation.
-Analyze the following natural language spoken campus walk transcript and extract a complete, floor-wise spatial graph and step-by-step route permutations.
+  const systemPrompt = `You are an expert AI Spatial Graph Architect and Navigation Dataset Synthesizer for Smart College Indoor/Outdoor Navigation Systems.
+Your goal is to parse the provided raw natural language campus walk description, identify every physical location/entity by name, extract atomic graph nodes & directional edges, and synthesize complete step-by-step route permutations.
 
-STRICT TAXONOMY & SCHEMA RULES:
-1. Every physical location MUST be classified into one of these exact node types:
-   ['entrance', 'junction', 'staircase', 'elevator', 'washroom', 'watercooler', 'classroom', 'lab', 'cabin', 'auditorium', 'library', 'canteen', 'facility']
-2. Assign each node a floor number (Ground Floor = 0, First Floor = 1, Second Floor = 2, Third Floor = 3).
-3. Identify Staircase and Elevator nodes as special inter-floor connectors linking adjacent floors.
-4. Extract directional edges between adjacent nodes with stepsCount, headingText (straight, turn left, turn right, take stairs up, take stairs down, take elevator), and standard instruction prompt format ("Move straight approx N steps and [action].").
-5. Format every step instruction strictly as:
-   "Move straight approx [N] steps and [turn left / turn right / take stairs up / take stairs down / take elevator / reach destination]."
+================================================================================
+1. STRICT PHYSICAL NODE TAXONOMY & CLASSIFICATION RULES
+================================================================================
+Every physical location or landmark extracted MUST be assigned one of the following exact \`type\` values:
+- \`entrance\`: Main entrances, building gates, exit doors (e.g. "Main Entrance", "Block A Gate", "Library Gate")
+- \`junction\`: Hallway turns, corridor intersections, T-junctions (e.g. "Main Corridor Junction", "North Hallway Crossroads")
+- \`staircase\`: Stairs linking floors (e.g. "Staircase Floor 1", "Central Stairwell")
+- \`elevator\`: Lifts & Elevators (e.g. "Main Lift Floor 1", "Block B Elevator")
+- \`classroom\`: Lecture halls, tutorial rooms, classrooms (e.g. "Classroom 101", "Lecture Theatre 3")
+- \`lab\`: Computer labs, research labs, science labs (e.g. "Data Science Lab", "AI Research Center", "Physics Lab")
+- \`cabin\`: Faculty cabins, HOD offices, admin offices (e.g. "Dean Office", "HOD CSE Cabin", "Dr. Sharma Cabin")
+- \`washroom\`: Restrooms & washrooms (e.g. "Gents Washroom F1", "Ladies Restroom F2")
+- \`watercooler\`: Drinking water fountains/coolers (e.g. "Water Cooler Station F1", "Filter Station F2")
+- \`auditorium\`: Auditoriums, seminar halls, event centers (e.g. "Main Auditorium", "Seminar Hall B")
+- \`library\`: Central library, department reading rooms (e.g. "Central Library", "Digital Resource Center")
+- \`canteen\`: Cafeteria, food courts, coffee shops (e.g. "Campus Canteen", "Nescafe Kiosk")
+- \`facility\`: General campus facilities, accounts, reprographics (e.g. "Accounts Office", "Printing Center")
 
-Raw Spoken Campus Transcript:
-"${rawTranscriptText}"
+================================================================================
+2. STANDARDIZED NAVIGATION STEP PROMPT FORMAT
+================================================================================
+Every single step instruction generated in edges and routes MUST strictly follow this exact format:
+"Move straight approx [N] steps and [Action]."
 
-Return strictly raw valid JSON with the following structure (no markdown formatting around json):
+Allowed Actions:
+- "turn left" (headingDegrees: 270)
+- "turn right" (headingDegrees: 90)
+- "continue straight" (headingDegrees: 0)
+- "take stairs up" (headingDegrees: 0)
+- "take stairs down" (headingDegrees: 180)
+- "take elevator" (headingDegrees: 0)
+- "reach [Destination Name]" (for arrival at destination)
+
+================================================================================
+3. ROUTE PERMUTATIONS SYNTHESIS RULES
+================================================================================
+- Synthesize complete step-by-step navigation routes from the starting location (e.g. "Main Entrance") to EVERY named destination node (labs, classrooms, washrooms, cabins, library, auditorium, etc.).
+- Calculate totalSteps by summing the stepsCount across all steps in the route.
+- Calculate totalDistanceMeters as Math.round(totalSteps * 0.75).
+- For multi-floor navigation, routing MUST first direct the user to the staircase or elevator node on the current floor, include the stair climbing/descending transition step, and then navigate on the target floor to the final destination.
+
+================================================================================
+4. REQUIRED STRICT JSON OUTPUT FORMAT
+================================================================================
+Return ONLY raw valid JSON (no markdown formatting around json):
+
 {
   "nodes": [
     {
       "id": "node_id",
       "name": "Node Name",
       "aliases": ["alias1", "alias2"],
-      "building": "Main Building",
+      "building": "Main Campus",
       "floor": 1,
-      "type": "classroom|staircase|elevator|entrance|junction|washroom|watercooler|cabin|auditorium|lab|library|canteen|facility"
+      "type": "entrance|junction|staircase|elevator|classroom|lab|cabin|washroom|watercooler|auditorium|library|canteen|facility"
     }
   ],
   "edges": [
@@ -59,12 +92,12 @@ Return strictly raw valid JSON with the following structure (no markdown formatt
   "routes": [
     {
       "id": "route_id",
-      "category": "lab",
+      "category": "lab|classroom|cabin|washroom|watercooler|auditorium|library|canteen|facility",
       "destinationName": "Data Science Lab",
       "aliases": ["ds lab"],
       "startPoint": "Main Entrance",
-      "building": "Main Building",
-      "floor": 2,
+      "building": "Main Campus",
+      "floor": 1,
       "totalSteps": 40,
       "totalDistanceMeters": 30,
       "overviewSummary": "Route from Main Entrance to Data Science Lab.",
@@ -80,7 +113,10 @@ Return strictly raw valid JSON with the following structure (no markdown formatt
       ]
     }
   ]
-}`;
+}
+
+Raw Spoken Campus Transcript to Synthesize:
+"${rawTranscriptText}"`;
 
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
