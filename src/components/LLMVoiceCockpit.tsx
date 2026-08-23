@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LLMRouteKnowledge, LLMStepInstruction } from '../data/llmRoutesKnowledge';
-import { Volume2, CheckCircle2, MapPin, ArrowUp, ArrowLeft, ArrowRight, Layers, ArrowUpRight, ArrowDownRight, Footprints } from 'lucide-react';
+import { Volume2, CheckCircle2, MapPin, ArrowUp, ArrowLeft, ArrowRight, Layers, ArrowUpRight, ArrowDownRight, Footprints, Compass } from 'lucide-react';
 import { sensorService } from '../services/sensorService';
 import { speechService } from '../services/speechService';
 
@@ -50,16 +50,24 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
     return sensorService.watchStepCounter((steps) => setSegmentSteps(steps));
   }, []);
 
-  // Speak active step voice prompt
+  // Speak active step voice prompt with landmark orientation on Step 1
   useEffect(() => {
     if (isNavigating && activeStep) {
-      speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt || activeStep.instruction}`);
+      if (currentStepIndex === 0 && route.facingOrientation) {
+        speechService.speak(`Starting navigation from ${route.startPoint}. ${route.facingOrientation}. Step 1: ${activeStep.voicePrompt || activeStep.instruction}`);
+      } else {
+        speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt || activeStep.instruction}`);
+      }
     }
-  }, [currentStepIndex, activeStep, isNavigating]);
+  }, [currentStepIndex, activeStep, isNavigating, route.facingOrientation, route.startPoint]);
 
   const handleSpeakCurrentStep = () => {
     if (activeStep) {
-      speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt || activeStep.instruction}`);
+      if (currentStepIndex === 0 && route.facingOrientation) {
+        speechService.speak(`Start at ${route.startPoint}. ${route.facingOrientation}. Step 1: ${activeStep.voicePrompt || activeStep.instruction}`);
+      } else {
+        speechService.speak(`Step ${activeStep.stepNumber}: ${activeStep.voicePrompt || activeStep.instruction}`);
+      }
     }
   };
 
@@ -87,7 +95,7 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
   const stepProgress = Math.min(100, Math.round((segmentSteps / targetSteps) * 100));
   const isLastStep = currentStepIndex === route.steps.length - 1;
 
-  // Format standard instruction prompt (e.g., "Move straight approx 30 steps and turn right")
+  // Format standard instruction prompt (e.g., "Move straight approx 15 steps")
   const standardInstructionPrompt = activeStep
     ? activeStep.instruction
     : "Move straight approx 20 steps to reach destination.";
@@ -109,6 +117,19 @@ export const LLMVoiceCockpit: React.FC<LLMVoiceCockpitProps> = ({ route, isNavig
             Read Aloud
           </button>
         </div>
+
+        {/* INITIAL LANDMARK FACING ORIENTATION CARD */}
+        {route.facingOrientation && currentStepIndex === 0 && (
+          <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 space-y-1">
+            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-amber-800 tracking-wider">
+              <Compass className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+              <span>Landmark Orientation Before Starting:</span>
+            </div>
+            <p className="text-[11px] font-bold text-slate-800 leading-snug">
+              📍 <strong>{route.startPoint}</strong>: {route.facingOrientation}
+            </p>
+          </div>
+        )}
 
         {/* Landmark Hint */}
         {activeStep?.landmarkHint && (

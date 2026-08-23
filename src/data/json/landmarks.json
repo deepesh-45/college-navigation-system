@@ -1,0 +1,22 @@
+[
+  {
+    "id": "landmark_floor_1_main_entrance",
+    "name": "Main Entrance",
+    "floor": 1,
+    "floorName": "Ground Floor (Floor 1)",
+    "building": "Main Campus",
+    "facingOrientation": "Face the same way as you enter through the main entrance",
+    "aliases": ["main entrance", "entrance", "gate", "main gate", "ground floor entrance"],
+    "type": "entrance"
+  },
+  {
+    "id": "landmark_floor_2_stair_landing",
+    "name": "Stair Landing",
+    "floor": 2,
+    "floorName": "First Floor (Floor 2)",
+    "building": "Main Campus",
+    "facingOrientation": "Face towards the wall at the end of the staircase",
+    "aliases": ["stair landing", "stair end", "staircase first floor", "stairs first floor", "first floor stairs"],
+    "type": "staircase"
+  }
+]

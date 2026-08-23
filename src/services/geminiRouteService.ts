@@ -1,5 +1,6 @@
 import { LLMRouteKnowledge, LLMStepInstruction } from '../data/llmRoutesKnowledge';
 import { GROUND_FLOOR_CORPUS, FIRST_FLOOR_CORPUS } from '../data/corpuses';
+import { CAMPUS_LANDMARKS, findLandmarkByNameOrAlias, getAnchorLandmarkForFloor } from '../data/landmarksData';
 
 export interface ParsedVoiceIntent {
   startPoint: string;
@@ -24,6 +25,10 @@ export const parseVoiceIntentWithGemini = async (
   const systemPrompt = `You are a Smart Campus Voice Intent Parser.
 Extract the starting location and destination from the user's spoken voice query.
 If the starting location is not explicitly mentioned by the user, default startPoint to "Main Entrance".
+
+Available Campus Anchor Landmarks:
+- Ground Floor (Floor 1): "Main Entrance" (Orientation: Face the same way as you enter through the main entrance)
+- First Floor (Floor 2): "Stair Landing" (Orientation: Face towards the wall at the end of the staircase)
 
 User Spoken Query: "${userVoiceQuery}"
 
@@ -81,7 +86,7 @@ Return strictly raw valid JSON (no markdown formatting around json):
   };
 };
 
-// Generate Step-by-Step Navigation Directly from Raw Spoken Corpuses (Simple Atomic Single-Action Steps)
+// Generate Step-by-Step Navigation Directly from Raw Spoken Corpuses with Landmark Facing Orientation
 export const generateRouteDirectlyFromCorpus = async (
   destinationQuery: string,
   startPoint: string = 'Main Entrance'
@@ -89,8 +94,14 @@ export const generateRouteDirectlyFromCorpus = async (
   const { primary, fallback } = getGeminiApiKeys();
   const apiKeysToTry = [primary, fallback].filter(k => k && !k.includes('DemoApiKey'));
 
+  const matchedLandmark = findLandmarkByNameOrAlias(startPoint) || getAnchorLandmarkForFloor(1);
+  const facingOrientation = matchedLandmark.facingOrientation;
+
   const systemPrompt = `You are a Smart Campus Navigation AI Engine.
-Analyze the following raw spoken campus walk corpuses and generate a step-by-step navigation route from "${startPoint}" to "${destinationQuery}".
+Analyze the raw spoken campus walk corpuses and generate a step-by-step navigation route from "${matchedLandmark.name}" to "${destinationQuery}".
+
+STARTING LANDMARK ORIENTATION INSTRUCTION:
+"${facingOrientation}"
 
 RAW CAMPUS CORPUSES:
 [GROUND FLOOR (FLOOR 1)]:
@@ -114,12 +125,13 @@ Return strictly raw valid JSON (no markdown formatting around json):
   "category": "lab|classroom|cabin|washroom|watercooler|auditorium|library|canteen|facility",
   "destinationName": "${destinationQuery}",
   "aliases": ["${destinationQuery.toLowerCase()}"],
-  "startPoint": "${startPoint}",
+  "startPoint": "${matchedLandmark.name}",
+  "facingOrientation": "${facingOrientation}",
   "building": "Main Campus",
-  "floor": 1,
+  "floor": ${matchedLandmark.floor},
   "totalSteps": 35,
   "totalDistanceMeters": 26,
-  "overviewSummary": "Direct atomic step navigation from ${startPoint} to ${destinationQuery}.",
+  "overviewSummary": "Direct atomic step navigation from ${matchedLandmark.name} to ${destinationQuery}.",
   "steps": [
     {
       "stepNumber": 1,
@@ -128,14 +140,6 @@ Return strictly raw valid JSON (no markdown formatting around json):
       "headingText": "straight",
       "stepsCount": 15,
       "voicePrompt": "Move straight approx 15 steps."
-    },
-    {
-      "stepNumber": 2,
-      "instruction": "Turn left.",
-      "headingDegrees": 270,
-      "headingText": "turn left",
-      "stepsCount": 0,
-      "voicePrompt": "Turn left."
     }
   ]
 }`;
@@ -155,28 +159,37 @@ Return strictly raw valid JSON (no markdown formatting around json):
       const cleanJsonText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJsonText);
       if (parsed && parsed.steps && parsed.steps.length > 0) {
+        parsed.facingOrientation = facingOrientation;
         return parsed as LLMRouteKnowledge;
       }
     } catch (err) {
-      console.warn('Gemini API Key attempt notice, using local atomic corpus path builder:', err);
+      console.warn('Gemini API Key attempt notice, using local landmark corpus path builder:', err);
     }
   }
 
-  // Pure Deterministic Atomic Single-Action Corpus Path Builder Fallback
+  // Pure Deterministic Landmark Corpus Path Builder Fallback
   return generateLocalCorpusAtomicPath(destinationQuery, startPoint);
 };
 
-// Deterministic Atomic Single-Action Corpus Path Builder (ONE action per step)
+// Deterministic Landmark Corpus Path Builder with Facing Orientation
 const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMRouteKnowledge => {
   const destLower = destination.toLowerCase();
-  const startName = start.trim() || 'Main Entrance';
+
+  // Match starting landmark (Floor 1: Main Entrance, Floor 2: Stair Landing)
+  const landmark = findLandmarkByNameOrAlias(start) || 
+    (start.toLowerCase().includes('first floor') || start.toLowerCase().includes('stair') 
+      ? CAMPUS_LANDMARKS[1] 
+      : CAMPUS_LANDMARKS[0]);
+
+  const startName = landmark.name;
+  const facingOrientation = landmark.facingOrientation;
 
   const steps: LLMStepInstruction[] = [];
   let totalSteps = 0;
-  let floor = 1;
+  let floor = landmark.floor;
   let category: LLMRouteKnowledge['category'] = 'facility';
 
-  // Atomic Single-Action Steps Definitions
+  // Ground Floor Atomic Steps (Starting from Main Entrance)
   const stepWalkToJunction: LLMStepInstruction = {
     stepNumber: 1,
     instruction: `Move straight approx 15 steps from ${startName} to hallway junction.`,
@@ -294,7 +307,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
     voicePrompt: "Reach Node 8 facility."
   };
 
-  // First Floor Atomic Steps
+  // First Floor Atomic Steps (Starting from Stair Landing)
   const stepClimbStairs: LLMStepInstruction = {
     stepNumber: 4,
     instruction: "Take stairs up to First Floor.",
@@ -305,7 +318,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepWalkToAuditorium: LLMStepInstruction = {
-    stepNumber: 5,
+    stepNumber: 1,
     instruction: "Move straight approx 10 steps.",
     headingDegrees: 0,
     headingText: "straight",
@@ -314,7 +327,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepArriveAuditorium: LLMStepInstruction = {
-    stepNumber: 6,
+    stepNumber: 2,
     instruction: "Reach Main Auditorium.",
     headingDegrees: 0,
     headingText: "arrive",
@@ -323,7 +336,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepTurnRightAuditorium: LLMStepInstruction = {
-    stepNumber: 6,
+    stepNumber: 2,
     instruction: "Turn right.",
     headingDegrees: 90,
     headingText: "turn right",
@@ -332,7 +345,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepWalkToAILab: LLMStepInstruction = {
-    stepNumber: 7,
+    stepNumber: 3,
     instruction: "Move straight approx 25 steps.",
     headingDegrees: 0,
     headingText: "straight",
@@ -341,7 +354,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepArriveAILab: LLMStepInstruction = {
-    stepNumber: 8,
+    stepNumber: 4,
     instruction: "Reach AI Research Center.",
     headingDegrees: 0,
     headingText: "arrive",
@@ -350,7 +363,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepWalkToLibrary: LLMStepInstruction = {
-    stepNumber: 8,
+    stepNumber: 4,
     instruction: "Move straight approx 15 steps.",
     headingDegrees: 0,
     headingText: "straight",
@@ -359,7 +372,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepArriveLibrary: LLMStepInstruction = {
-    stepNumber: 9,
+    stepNumber: 5,
     instruction: "Reach Central Library.",
     headingDegrees: 0,
     headingText: "arrive",
@@ -368,7 +381,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepTurnLeftLibrary: LLMStepInstruction = {
-    stepNumber: 9,
+    stepNumber: 5,
     instruction: "Turn left.",
     headingDegrees: 270,
     headingText: "turn left",
@@ -377,7 +390,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepWalkToCabins: LLMStepInstruction = {
-    stepNumber: 10,
+    stepNumber: 6,
     instruction: "Move straight approx 12 steps.",
     headingDegrees: 0,
     headingText: "straight",
@@ -386,7 +399,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepArriveCabins: LLMStepInstruction = {
-    stepNumber: 11,
+    stepNumber: 7,
     instruction: "Reach Faculty Cabins.",
     headingDegrees: 0,
     headingText: "arrive",
@@ -395,7 +408,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepWalkToWashroom: LLMStepInstruction = {
-    stepNumber: 11,
+    stepNumber: 7,
     instruction: "Move straight approx 8 steps.",
     headingDegrees: 0,
     headingText: "straight",
@@ -404,7 +417,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
   };
 
   const stepArriveWashroom: LLMStepInstruction = {
-    stepNumber: 12,
+    stepNumber: 8,
     instruction: "Reach Washroom.",
     headingDegrees: 0,
     headingText: "arrive",
@@ -412,70 +425,92 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
     voicePrompt: "Reach Washroom."
   };
 
-  // Build Route based on Destination Query using Atomic Steps (ONE action per step)
-  if (destLower.includes('junction')) {
-    steps.push(stepWalkToJunction);
-  } else if (destLower.includes('stair')) {
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs);
-  } else if (destLower.includes('elevator') || destLower.includes('lift')) {
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator);
-  } else if (destLower.includes('node 5') || destLower.includes('node5')) {
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator, stepWalkToNode5, stepArriveNode5);
-  } else if (destLower.includes('node 6') || destLower.includes('node6')) {
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator, stepWalkToNode5, stepWalkToNode6, stepArriveNode6);
-  } else if (destLower.includes('data science') || destLower.includes('ds lab')) {
-    category = 'lab';
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToDSLab, stepArriveDSLab);
-  } else if (destLower.includes('node 8') || destLower.includes('node8')) {
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToDSLab, stepTurnLeftDSLab, stepWalkToNode8, stepArriveNode8);
-  } else if (destLower.includes('auditorium')) {
-    floor = 2;
-    category = 'auditorium';
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepArriveAuditorium);
-  } else if (destLower.includes('ai') || destLower.includes('research')) {
-    floor = 2;
-    category = 'lab';
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepArriveAILab);
-  } else if (destLower.includes('library')) {
-    floor = 2;
-    category = 'library';
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepArriveLibrary);
-  } else if (destLower.includes('cabin') || destLower.includes('faculty')) {
-    floor = 2;
-    category = 'cabin';
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepTurnLeftLibrary, stepWalkToCabins, stepArriveCabins);
-  } else if (destLower.includes('washroom') || destLower.includes('toilet') || destLower.includes('restroom')) {
-    floor = 2;
-    category = 'washroom';
-    steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepTurnLeftLibrary, stepWalkToCabins, stepWalkToWashroom, stepArriveWashroom);
+  // If starting from First Floor Landmark (Stair Landing):
+  if (landmark.floor === 2) {
+    if (destLower.includes('auditorium')) {
+      category = 'auditorium';
+      steps.push(stepWalkToAuditorium, stepArriveAuditorium);
+    } else if (destLower.includes('ai') || destLower.includes('research')) {
+      category = 'lab';
+      steps.push(stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepArriveAILab);
+    } else if (destLower.includes('library')) {
+      category = 'library';
+      steps.push(stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepArriveLibrary);
+    } else if (destLower.includes('cabin') || destLower.includes('faculty')) {
+      category = 'cabin';
+      steps.push(stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepTurnLeftLibrary, stepWalkToCabins, stepArriveCabins);
+    } else if (destLower.includes('washroom') || destLower.includes('toilet') || destLower.includes('restroom')) {
+      category = 'washroom';
+      steps.push(stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepTurnLeftLibrary, stepWalkToCabins, stepWalkToWashroom, stepArriveWashroom);
+    } else {
+      steps.push(stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepArriveAILab);
+    }
   } else {
-    // Custom landmark
-    steps.push(
-      {
-        stepNumber: 1,
-        instruction: `Move straight approx 15 steps from ${startName}.`,
-        headingDegrees: 0,
-        headingText: "straight",
-        stepsCount: 15,
-        voicePrompt: `Move straight approx 15 steps from ${startName}.`
-      },
-      {
-        stepNumber: 2,
-        instruction: "Turn right.",
-        headingDegrees: 90,
-        headingText: "turn right",
-        stepsCount: 0,
-        voicePrompt: "Turn right."
-      },
-      {
-        stepNumber: 3,
-        instruction: `Move straight approx 20 steps to reach ${destination}.`,
-        headingDegrees: 0,
-        headingText: "straight",
-        stepsCount: 20,
-        voicePrompt: `Move straight approx 20 steps to reach ${destination}.`
-      }
-    );
+    // Starting from Ground Floor Landmark (Main Entrance):
+    if (destLower.includes('junction')) {
+      steps.push(stepWalkToJunction);
+    } else if (destLower.includes('stair')) {
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs);
+    } else if (destLower.includes('elevator') || destLower.includes('lift')) {
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator);
+    } else if (destLower.includes('node 5') || destLower.includes('node5')) {
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator, stepWalkToNode5, stepArriveNode5);
+    } else if (destLower.includes('node 6') || destLower.includes('node6')) {
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToElevator, stepWalkToNode5, stepWalkToNode6, stepArriveNode6);
+    } else if (destLower.includes('data science') || destLower.includes('ds lab')) {
+      category = 'lab';
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToDSLab, stepArriveDSLab);
+    } else if (destLower.includes('node 8') || destLower.includes('node8')) {
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepWalkToDSLab, stepTurnLeftDSLab, stepWalkToNode8, stepArriveNode8);
+    } else if (destLower.includes('auditorium')) {
+      floor = 2;
+      category = 'auditorium';
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepArriveAuditorium);
+    } else if (destLower.includes('ai') || destLower.includes('research')) {
+      floor = 2;
+      category = 'lab';
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepArriveAILab);
+    } else if (destLower.includes('library')) {
+      floor = 2;
+      category = 'library';
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepArriveLibrary);
+    } else if (destLower.includes('cabin') || destLower.includes('faculty')) {
+      floor = 2;
+      category = 'cabin';
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepTurnLeftLibrary, stepWalkToCabins, stepArriveCabins);
+    } else if (destLower.includes('washroom') || destLower.includes('toilet') || destLower.includes('restroom')) {
+      floor = 2;
+      category = 'washroom';
+      steps.push(stepWalkToJunction, stepTurnLeftJunction, stepWalkToStairs, stepClimbStairs, stepWalkToAuditorium, stepTurnRightAuditorium, stepWalkToAILab, stepWalkToLibrary, stepTurnLeftLibrary, stepWalkToCabins, stepWalkToWashroom, stepArriveWashroom);
+    } else {
+      // Custom landmark
+      steps.push(
+        {
+          stepNumber: 1,
+          instruction: `Move straight approx 15 steps from ${startName}.`,
+          headingDegrees: 0,
+          headingText: "straight",
+          stepsCount: 15,
+          voicePrompt: `Move straight approx 15 steps from ${startName}.`
+        },
+        {
+          stepNumber: 2,
+          instruction: "Turn right.",
+          headingDegrees: 90,
+          headingText: "turn right",
+          stepsCount: 0,
+          voicePrompt: "Turn right."
+        },
+        {
+          stepNumber: 3,
+          instruction: `Move straight approx 20 steps to reach ${destination}.`,
+          headingDegrees: 0,
+          headingText: "straight",
+          stepsCount: 20,
+          voicePrompt: `Move straight approx 20 steps to reach ${destination}.`
+        }
+      );
+    }
   }
 
   // Renumber step numbers sequentially
@@ -491,6 +526,7 @@ const generateLocalCorpusAtomicPath = (destination: string, start: string): LLMR
     destinationName: destination,
     aliases: [destination.toLowerCase()],
     startPoint: startName,
+    facingOrientation,
     building: 'Main Campus',
     floor,
     totalSteps,

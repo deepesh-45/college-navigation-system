@@ -25,6 +25,7 @@ export interface LLMRouteKnowledge {
   destinationName: string;
   aliases: string[];
   startPoint: string;
+  facingOrientation?: string;
   building: string;
   floor: number;
   totalSteps: number;
@@ -33,7 +34,6 @@ export interface LLMRouteKnowledge {
   steps: LLMStepInstruction[];
 }
 
-// Clean dataset array for real campus corpus synthesis
 export const LLM_ROUTES_KNOWLEDGE: LLMRouteKnowledge[] = [];
 
 export const saveLLMRoutesToStorage = () => {
